@@ -36,6 +36,41 @@ object TmdbMetadataService {
     private val entityBrowseCache = mutableMapOf<String, TmdbEntityBrowseData>()
     private val entityHeaderCache = mutableMapOf<String, TmdbEntityHeader>()
     private val entityRailCache = mutableMapOf<String, List<MetaPreview>>()
+    private val logoCache = mutableMapOf<String, String?>()
+
+    /**
+     * Lightweight variant of [enrichMeta] that only hits the `/images` endpoint,
+     * skipping details/credits/episodes/etc. Used to backfill missing clearlogos
+     * (e.g. for Home hero items whose catalog payload has no logo field).
+     */
+    suspend fun fetchLogo(
+        type: String,
+        id: String,
+        settings: TmdbSettings,
+    ): String? {
+        if (!settings.enabled || !settings.hasApiKey || !settings.useArtwork) return null
+
+        val tmdbType = normalizeMetaType(type)
+        val tmdbId = TmdbService.ensureTmdbId(id, tmdbType) ?: return null
+        val normalizedLanguage = normalizeTmdbLanguage(settings.language)
+        val cacheKey = "$tmdbId:$tmdbType:$normalizedLanguage"
+        if (logoCache.containsKey(cacheKey)) return logoCache[cacheKey]
+
+        val numericId = tmdbId.toIntOrNull() ?: return null
+        val includeImageLanguage = buildString {
+            append(normalizedLanguage.substringBefore("-"))
+            append(",")
+            append(normalizedLanguage)
+            append(",en,null")
+        }
+        val images = fetch<TmdbImagesResponse>(
+            endpoint = "$tmdbType/$numericId/images",
+            query = mapOf("include_image_language" to includeImageLanguage),
+        )
+        val logo = buildImageUrl(images?.logos.orEmpty().selectBestLocalizedImagePath(normalizedLanguage), "w500")
+        logoCache[cacheKey] = logo
+        return logo
+    }
 
     suspend fun fetchPersonDetail(
         personId: Int,
@@ -1166,27 +1201,27 @@ internal data class TmdbEnrichment(
 ) {
     fun hasContent(): Boolean =
         localizedTitle != null ||
-            description != null ||
-            genres.isNotEmpty() ||
-            backdrop != null ||
-            logo != null ||
-            poster != null ||
-            people.isNotEmpty() ||
-            director.isNotEmpty() ||
-            writer.isNotEmpty() ||
-            releaseInfo != null ||
-            lastAirDate != null ||
-            rating != null ||
-            runtimeMinutes != null ||
-            ageRating != null ||
-            status != null ||
-            countries.isNotEmpty() ||
-            language != null ||
-            productionCompanies.isNotEmpty() ||
-            networks.isNotEmpty() ||
-            collectionItems.isNotEmpty() ||
-            moreLikeThis.isNotEmpty() ||
-            trailers.isNotEmpty()
+                description != null ||
+                genres.isNotEmpty() ||
+                backdrop != null ||
+                logo != null ||
+                poster != null ||
+                people.isNotEmpty() ||
+                director.isNotEmpty() ||
+                writer.isNotEmpty() ||
+                releaseInfo != null ||
+                lastAirDate != null ||
+                rating != null ||
+                runtimeMinutes != null ||
+                ageRating != null ||
+                status != null ||
+                countries.isNotEmpty() ||
+                language != null ||
+                productionCompanies.isNotEmpty() ||
+                networks.isNotEmpty() ||
+                collectionItems.isNotEmpty() ||
+                moreLikeThis.isNotEmpty() ||
+                trailers.isNotEmpty()
 }
 
 private data class EnrichmentPayload(

@@ -11,6 +11,8 @@ import com.nuvio.app.features.collection.CollectionSource
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
 import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.collection.findCollectionCatalog
+import com.nuvio.app.features.tmdb.TmdbMetadataService
+import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +44,8 @@ object HomeRepository {
     private var collectionHeroRequestKey: String? = null
     private var lastPublishedCatalogHeroEmpty: Boolean = true
     private var lastErrorMessage: String? = null
+    private var heroLogoCache: Map<String, String?> = emptyMap()
+    private var heroLogoJob: Job? = null
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
         val activeAddons = addons.enabledAddons()
@@ -182,6 +186,9 @@ object HomeRepository {
         collectionHeroRequestKey = null
         lastPublishedCatalogHeroEmpty = true
         lastErrorMessage = null
+        heroLogoCache = emptyMap()
+        heroLogoJob?.cancel()
+        heroLogoJob = null
         _uiState.value = HomeUiState()
     }
 
@@ -227,7 +234,7 @@ object HomeRepository {
         }
         lastPublishedCatalogHeroEmpty = snapshot.heroEnabled && catalogHeroItems.isEmpty()
         val heroItems = if (snapshot.heroEnabled) {
-            catalogHeroItems.ifEmpty { cachedCollectionHeroItems }
+            catalogHeroItems.ifEmpty { cachedCollectionHeroItems }.map { it.withCachedHeroLogo() }
         } else {
             emptyList()
         }
@@ -238,6 +245,47 @@ object HomeRepository {
             sections = sections,
             errorMessage = if (sections.isEmpty()) lastErrorMessage else null,
         )
+
+        if (snapshot.heroEnabled && heroItems.isNotEmpty()) {
+            ensureHeroLogos(items = heroItems, requestKey = requestKey)
+        }
+    }
+
+    private fun MetaPreview.withCachedHeroLogo(): MetaPreview {
+        if (!logo.isNullOrBlank()) return this
+        val cachedLogo = heroLogoCache[stableKey()] ?: return this
+        return copy(logo = cachedLogo)
+    }
+
+    private fun ensureHeroLogos(items: List<MetaPreview>, requestKey: String?) {
+        val settings = TmdbSettingsRepository.snapshot()
+        if (!settings.enabled || !settings.hasApiKey || !settings.useArtwork) return
+
+        val pending = items.filter { item ->
+            item.logo.isNullOrBlank() && !heroLogoCache.containsKey(item.stableKey())
+        }
+        if (pending.isEmpty()) return
+
+        heroLogoJob?.cancel()
+        heroLogoJob = scope.launch {
+            val results = pending.map { item ->
+                async {
+                    item.stableKey() to runCatching {
+                        TmdbMetadataService.fetchLogo(
+                            type = item.type,
+                            id = item.id,
+                            settings = settings,
+                        )
+                    }.getOrNull()
+                }
+            }.awaitAll()
+
+            heroLogoCache = heroLogoCache + results.toMap()
+            publishCurrentState(
+                isLoading = _uiState.value.isLoading,
+                requestKey = requestKey,
+            )
+        }
     }
 
     private suspend fun HomeCatalogDefinition.toSection(): HomeCatalogSection {
@@ -340,7 +388,7 @@ object HomeRepository {
         return CollectionRepository.collections.value
             .filter { collection ->
                 collection.folders.isNotEmpty() &&
-                    preferences["collection_${collection.id}"]?.enabled != false
+                        preferences["collection_${collection.id}"]?.enabled != false
             }
             .sortedBy { collection ->
                 preferences["collection_${collection.id}"]?.order ?: Int.MAX_VALUE

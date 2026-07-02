@@ -1665,6 +1665,11 @@ button:disabled {
   transition: opacity var(--motion-standard) ease;
 }
 
+.modal-layer.modal-anchored {
+  display: block;
+  place-items: unset;
+}
+
 .modal-layer.modal-visible {
   opacity: 1;
   pointer-events: auto;
@@ -1687,21 +1692,32 @@ button:disabled {
   color: #fff;
   box-shadow: 0 20px 70px rgba(0, 0, 0, .45);
   opacity: 0;
-  transform: translateY(14px) scale(.985);
+  transform: translateX(var(--anchor-shift, 0)) translateY(14px) scale(.985);
   transition:
     transform var(--motion-panel) var(--ease-out),
     opacity var(--motion-standard) ease;
   will-change: transform, opacity;
 }
 
+/* Anchored modals (audio/subtitles/sources/episodes) open near the
+   trigger button instead of the center of the screen, so the mouse
+   doesn't have to travel across the whole player to reach them. */
+.modal-layer.modal-anchored .track-panel {
+  position: absolute;
+  left: var(--anchor-left, 50%);
+  bottom: var(--anchor-bottom, 24px);
+  top: auto;
+  --anchor-shift: -50%;
+}
+
 .modal-layer.modal-visible .track-panel {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(var(--anchor-shift, 0)) translateY(0) scale(1);
 }
 
 .modal-layer.modal-closing .track-panel {
   opacity: 0;
-  transform: translateY(10px) scale(.99);
+  transform: translateX(var(--anchor-shift, 0)) translateY(10px) scale(.99);
 }
 
 .track-panel.wide {
@@ -2342,6 +2358,16 @@ button.action:focus-visible {
 
   .modal-layer {
     padding: 14px;
+  }
+
+  .modal-layer.modal-anchored {
+    display: grid;
+    place-items: center;
+  }
+
+  .modal-layer.modal-anchored .track-panel {
+    position: static;
+    --anchor-shift: 0;
   }
 
   .episode-thumb {

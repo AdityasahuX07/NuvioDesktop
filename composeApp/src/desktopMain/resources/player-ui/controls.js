@@ -856,6 +856,64 @@ const closePlayerModal = (notifyDismiss = false, animated = true) => {
   renderChrome();
 };
 
+// Modals opened from an action-row button anchor to that button instead of
+// centering in the middle of the screen, so the pointer doesn't have to
+// travel from the bottom bar to the center to reach the selector.
+const modalAnchorCommand = {
+  audio: "audio",
+  subtitles: "subtitles",
+  sources: "sources",
+  episodes: "episodes",
+};
+
+const getModalAnchorButton = modal => {
+  const command = modalAnchorCommand[modal];
+  if (!command) return null;
+  return document.querySelector(`.action[data-command="${command}"]`);
+};
+
+const positionAnchoredModal = (modalElement, anchorButton) => {
+  const trackPanel = modalElement.querySelector(".track-panel");
+  if (!trackPanel || !anchorButton) return;
+
+  const playerRect = root.getBoundingClientRect();
+  const buttonRect = anchorButton.getBoundingClientRect();
+  if (!playerRect.width || !playerRect.height) return;
+
+  const margin = 16;
+  const gap = 10;
+  const panelWidth = trackPanel.offsetWidth;
+  const panelHeight = trackPanel.offsetHeight;
+
+  let left = buttonRect.left - playerRect.left + buttonRect.width / 2;
+  const minLeft = margin + panelWidth / 2;
+  const maxLeft = playerRect.width - margin - panelWidth / 2;
+  if (maxLeft >= minLeft) {
+    left = Math.min(Math.max(left, minLeft), maxLeft);
+  }
+
+  // Anchor to just above the seek bar (metadata text sits right above it),
+  // so the panel's bottom edge lines up with the bottom of the metadata
+  // text instead of the button itself.
+  const seekBar = document.getElementById("seek");
+  const clearanceTop = seekBar ? seekBar.getBoundingClientRect().top : buttonRect.top;
+
+  let bottom = playerRect.bottom - clearanceTop + gap;
+  const maxBottom = Math.max(margin, playerRect.height - margin - panelHeight);
+  bottom = Math.min(Math.max(bottom, margin), maxBottom);
+
+  trackPanel.style.setProperty("--anchor-left", `${left}px`);
+  trackPanel.style.setProperty("--anchor-bottom", `${bottom}px`);
+};
+
+const repositionActiveModalIfAnchored = () => {
+  if (!activeModal) return;
+  const modalElement = modalByName[activeModal];
+  if (!modalElement || !modalElement.classList.contains("modal-anchored")) return;
+  const anchorButton = getModalAnchorButton(activeModal);
+  if (anchorButton) positionAnchoredModal(modalElement, anchorButton);
+};
+
 const openPlayerModal = modal => {
   const targetModal = modalByName[modal];
   if (!targetModal) {
@@ -872,7 +930,12 @@ const openPlayerModal = modal => {
     };
   }
   renderActiveModal();
+  const anchorButton = getModalAnchorButton(modal);
   modalElements.forEach(modalElement => {
+    modalElement.classList.toggle(
+      "modal-anchored",
+      modalElement === targetModal && Boolean(anchorButton),
+    );
     setModalVisibility(modalElement, modalElement === targetModal);
   });
   renderChrome();
@@ -1545,6 +1608,7 @@ const renderActiveModal = () => {
   if (activeModal === "episodes") renderEpisodesModal();
   if (activeModal === "submitIntro") renderSubmitIntroModal();
   if (activeModal === "p2pConsent") renderP2pConsentModal();
+  window.requestAnimationFrame(repositionActiveModalIfAnchored);
 };
 
 window.nuvioNativeViewportChanged = () => {
@@ -1554,7 +1618,12 @@ window.nuvioNativeViewportChanged = () => {
     root.classList.remove("native-resizing");
   }, 180);
   if (activeModal) renderActiveModal();
+  window.requestAnimationFrame(repositionActiveModalIfAnchored);
 };
+
+window.addEventListener("resize", () => {
+  window.requestAnimationFrame(repositionActiveModalIfAnchored);
+});
 
 const trackListSignature = tracks =>
   normalizeTracks(tracks)
@@ -2208,6 +2277,7 @@ modalElements.forEach(modal => {
 const selectSubtitleTab = (tab, index) => {
   state = { ...state, subtitleActiveTab: tab };
   renderSubtitleModal();
+  window.requestAnimationFrame(repositionActiveModalIfAnchored);
   send("subtitleTab", index);
 };
 

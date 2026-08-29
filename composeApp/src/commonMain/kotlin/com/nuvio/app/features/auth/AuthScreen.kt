@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.core.ui.reportsDesktopTextInputFocus
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.settings.AppBrandWordmark
 import kotlin.math.abs
@@ -849,7 +850,8 @@ private fun AuthTextField(
             onValueChange = onValueChange,
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .reportsDesktopTextInputFocus(),
             singleLine = true,
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 color = AuthTextPrimary,

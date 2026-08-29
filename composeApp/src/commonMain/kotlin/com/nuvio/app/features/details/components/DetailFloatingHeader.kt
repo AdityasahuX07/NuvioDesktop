@@ -114,6 +114,7 @@ fun DetailFloatingHeader(
                             contentColor = MaterialTheme.colorScheme.onBackground,
                             buttonSize = 40.dp,
                             iconSize = 24.dp,
+                            focusable = false,
                         )
                     }
                 }
@@ -161,6 +162,7 @@ fun DetailFloatingHeader(
                         Spacer(modifier = Modifier.width(4.dp))
                         FullscreenActionButton(
                             enabled = interactive,
+                            focusable = false,
                             buttonSize = 40.dp,
                             iconSize = 22.dp,
                             contentColor = MaterialTheme.colorScheme.onBackground,

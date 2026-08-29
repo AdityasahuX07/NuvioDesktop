@@ -186,6 +186,8 @@ internal class PlayerScreenRuntime(
     var accumulatedSeekState by mutableStateOf<PlayerAccumulatedSeekState?>(null)
     var initialLoadCompleted by mutableStateOf(false)
     var speedBoostRestoreSpeed by mutableStateOf<Float?>(null)
+    var targetKeyboardSpeed by mutableStateOf<Float?>(null)
+    var targetKeyboardSpeedJob by mutableStateOf<Job?>(null)
     var isHoldToSpeedGestureActive by mutableStateOf(false)
     var initialSeekApplied by mutableStateOf(
         initialPositionMs <= 0L && ((initialProgressFraction ?: 0f) <= 0f),

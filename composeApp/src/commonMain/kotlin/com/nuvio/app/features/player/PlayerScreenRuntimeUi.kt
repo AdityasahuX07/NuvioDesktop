@@ -38,6 +38,7 @@ import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.isDesktop
 import com.nuvio.app.isIos
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
@@ -799,9 +800,6 @@ private fun PlayerScreenRuntime.handlePlayerControlsAction(action: PlayerControl
         PlayerControlsAction.SubmitIntro -> {
             submitIntroStatusMessage = null
         }
-        PlayerControlsAction.LockToggle -> {
-            if (playerControlsLocked) unlockPlayerControls() else lockPlayerControls()
-        }
         PlayerControlsAction.VideoSettings -> {
             if (isIos) {
                 showVideoSettingsModal = true
@@ -814,6 +812,105 @@ private fun PlayerScreenRuntime.handlePlayerControlsAction(action: PlayerControl
         }
         PlayerControlsAction.DoubleTapSeekForward -> {
             prepareDoubleTapSeekForNativeFallback(PlayerSeekDirection.Forward)
+            return false
+        }
+        PlayerControlsAction.KeyboardToggleSubtitle -> {
+            refreshTracks()
+            val currentIdx = subtitleTracks.indexOfFirst { it.isSelected }
+            if (currentIdx >= 0) {
+                playerController?.selectSubtitleTrack(-1)
+                showGestureMessage("Subtitles: Off")
+            } else {
+                val toSelect = subtitleTracks.firstOrNull { it.index >= 0 }
+                if (toSelect != null) {
+                    playerController?.selectSubtitleTrack(toSelect.index)
+                    showGestureMessage("Subtitles: ${toSelect.label ?: toSelect.language ?: "On"}")
+                }
+            }
+        }
+        PlayerControlsAction.KeyboardSequentialAudio -> {
+            if (audioTracks.isNotEmpty()) {
+                val currentIdx = audioTracks.indexOfFirst { it.isSelected }
+                val nextIdx = if (currentIdx + 1 < audioTracks.size) currentIdx + 1 else 0
+                val toSelect = audioTracks[nextIdx]
+                playerController?.selectAudioTrack(toSelect.index)
+                showGestureMessage("Audio: ${toSelect.label ?: toSelect.language ?: "Track ${nextIdx + 1}"}")
+            }
+        }
+        PlayerControlsAction.KeyboardSkipIntro -> {
+            if (activeSkipInterval != null && !skipIntervalDismissed) {
+                seekBy(((activeSkipInterval!!.endTime * 1000) - playbackSnapshot.positionMs).toLong())
+                skipIntervalDismissed = true
+            }
+        }
+        PlayerControlsAction.KeyboardNextEpisode -> {
+            playNextEpisode()
+        }
+        PlayerControlsAction.KeyboardSpeedUp -> {
+            val current = targetKeyboardSpeed ?: playbackSnapshot.playbackSpeed
+            val newSpeed = (current + 0.25f).coerceAtMost(4f)
+            targetKeyboardSpeed = newSpeed
+            playerController?.setPlaybackSpeed(newSpeed)
+            showGestureMessage(formatPlaybackSpeedLabel(newSpeed))
+            targetKeyboardSpeedJob?.cancel()
+            targetKeyboardSpeedJob = scope.launch {
+                delay(1000)
+                targetKeyboardSpeed = null
+            }
+        }
+        PlayerControlsAction.KeyboardSpeedDown -> {
+            val current = targetKeyboardSpeed ?: playbackSnapshot.playbackSpeed
+            val newSpeed = (current - 0.25f).coerceAtLeast(0.25f)
+            targetKeyboardSpeed = newSpeed
+            playerController?.setPlaybackSpeed(newSpeed)
+            showGestureMessage(formatPlaybackSpeedLabel(newSpeed))
+            targetKeyboardSpeedJob?.cancel()
+            targetKeyboardSpeedJob = scope.launch {
+                delay(1000)
+                targetKeyboardSpeed = null
+            }
+        }
+        PlayerControlsAction.KeyboardSpeedReset -> {
+            targetKeyboardSpeedJob?.cancel()
+            targetKeyboardSpeed = null
+            playerController?.setPlaybackSpeed(1f)
+            showGestureMessage(formatPlaybackSpeedLabel(1f))
+        }
+        PlayerControlsAction.KeyboardSubtitleDelayDecrease -> {
+            val newDelay = subtitleDelayMs - 50
+            setSubtitleDelay(newDelay)
+            showGestureMessage("Delay ${newDelay}ms")
+        }
+        PlayerControlsAction.KeyboardSubtitleDelayIncrease -> {
+            val newDelay = subtitleDelayMs + 50
+            setSubtitleDelay(newDelay)
+            showGestureMessage("Delay ${newDelay}ms")
+        }
+        PlayerControlsAction.KeyboardToggleMute -> {
+            return false
+        }
+        PlayerControlsAction.KeyboardSubtitleOpacityToggle -> {
+            val currentAlpha = subtitleStyle.textColor.alpha
+            val newAlpha = if (currentAlpha < 1f) 1f else 0.5f
+            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(textColor = subtitleStyle.textColor.copy(alpha = newAlpha)))
+            showGestureMessage("Sub Opacity: ${(newAlpha * 100).toInt()}%")
+        }
+        PlayerControlsAction.KeyboardSubtitleOpacityIncrease -> {
+            val newAlpha = (subtitleStyle.textColor.alpha + 0.1f).coerceAtMost(1f)
+            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(textColor = subtitleStyle.textColor.copy(alpha = newAlpha)))
+            showGestureMessage("Sub Opacity: ${(newAlpha * 100).toInt()}%")
+        }
+        PlayerControlsAction.KeyboardSubtitleOpacityDecrease -> {
+            val newAlpha = (subtitleStyle.textColor.alpha - 0.1f).coerceAtLeast(0f)
+            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(textColor = subtitleStyle.textColor.copy(alpha = newAlpha)))
+            showGestureMessage("Sub Opacity: ${(newAlpha * 100).toInt()}%")
+        }
+        PlayerControlsAction.KeyboardActivateHoldToSpeed -> {
+            activateHoldToSpeed()
+            return false
+        }
+        PlayerControlsAction.KeyboardDeactivateHoldToSpeed -> {
+            deactivateHoldToSpeed()
             return false
         }
     }

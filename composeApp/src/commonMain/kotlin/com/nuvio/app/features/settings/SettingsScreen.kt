@@ -597,6 +597,7 @@ private fun MobileSettingsScreen(
                             onAppearanceClick = { onPageChange(SettingsPage.Appearance) },
                             onAdvancedClick = { onPageChange(SettingsPage.Advanced) },
                             onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
+                            onShortcutsClick = { onPageChange(SettingsPage.Shortcuts) },
                             onContentDiscoveryClick = { onPageChange(SettingsPage.ContentDiscovery) },
                             onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
                             onTrackingClick = { onPageChange(SettingsPage.TraktAuthentication) },
@@ -687,6 +688,9 @@ private fun MobileSettingsScreen(
                         uiState = episodeReleaseNotificationsUiState,
                     )
                 }
+                SettingsPage.Shortcuts -> shortcutsSettingsContent(
+                    isTablet = false,
+                )
                 SettingsPage.ContinueWatching -> continueWatchingSettingsContent(
                     isTablet = false,
                     isVisible = continueWatchingPreferencesUiState.isVisible,
@@ -906,7 +910,10 @@ private fun TabletSettingsScreen(
                         selected = category == activeCategory,
                         onClick = {
                             selectedCategory = category.name
-                            if (page != SettingsPage.Root) {
+                            if (category == SettingsCategory.Shortcuts) {
+                                // Shortcuts has no sub-list — jump straight into it.
+                                onPageChange(SettingsPage.Shortcuts)
+                            } else if (page != SettingsPage.Root) {
                                 onPageChange(SettingsPage.Root)
                             }
                         },
@@ -1026,6 +1033,7 @@ private fun TabletSettingsScreen(
                                     onAppearanceClick = { openInlinePage(SettingsPage.Appearance) },
                                     onAdvancedClick = { openInlinePage(SettingsPage.Advanced) },
                                     onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
+                                    onShortcutsClick = { openInlinePage(SettingsPage.Shortcuts) },
                                     onContentDiscoveryClick = { openInlinePage(SettingsPage.ContentDiscovery) },
                                     onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
                                     onTrackingClick = { openInlinePage(SettingsPage.TraktAuthentication) },
@@ -1042,6 +1050,7 @@ private fun TabletSettingsScreen(
                                     showGeneralSection = activeCategory == SettingsCategory.General,
                                     showAboutSection = activeCategory == SettingsCategory.About,
                                     showAdvancedSection = activeCategory == SettingsCategory.Advanced,
+                                    showShortcutsSection = activeCategory == SettingsCategory.Shortcuts,
                                     showSupportersContributorsPage = AppFeaturePolicy.supportersContributorsPageEnabled,
                                 )
                             }
@@ -1120,6 +1129,9 @@ private fun TabletSettingsScreen(
                                 uiState = episodeReleaseNotificationsUiState,
                             )
                         }
+                        SettingsPage.Shortcuts -> shortcutsSettingsContent(
+                            isTablet = true,
+                        )
                         SettingsPage.ContinueWatching -> continueWatchingSettingsContent(
                             isTablet = true,
                             isVisible = continueWatchingPreferencesUiState.isVisible,

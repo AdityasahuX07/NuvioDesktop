@@ -38,6 +38,10 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ViewAgenda
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.LocalStickyHeaderInsetPx
+import com.nuvio.app.core.ui.focus.StickyHeaderExtraGap
+import com.nuvio.app.core.ui.focus.RegisterDpadNavActivation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,7 +60,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
@@ -237,16 +245,39 @@ fun LibraryScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val libraryFirstPosterFocusRequester = remember { FocusRequester() }
+        var libraryHasRequestedInitialFocus by remember { mutableStateOf(false) }
+        var libraryStickyHeaderHeightPx by remember { mutableStateOf(0) }
+        RegisterDpadNavActivation("Library") {
+            if (libraryHasRequestedInitialFocus) {
+                false
+            } else {
+                val activated = runCatching { libraryFirstPosterFocusRequester.requestFocus() }.isSuccess
+                if (activated) libraryHasRequestedInitialFocus = true
+                activated
+            }
+        }
         val gridColumns = remember(maxWidth) { posterGridColumnCountForWidth(maxWidth) }
+        val libraryStickyHeaderExtraGapPx = with(LocalDensity.current) { StickyHeaderExtraGap.roundToPx() }
 
+        CompositionLocalProvider(
+            LocalStickyHeaderInsetPx provides (libraryStickyHeaderHeightPx + libraryStickyHeaderExtraGapPx),
+        ) {
         NuvioScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .dpadNavigationContainer(),
             horizontalPadding = 0.dp,
             topPadding = if (topChromePadding != null) 0.dp else null,
             listState = listState,
         ) {
             stickyHeader {
-                Box(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coordinates ->
+                            libraryStickyHeaderHeightPx = coordinates.size.height
+                        },
+                ) {
                     Box(
                         modifier = Modifier
                             .matchParentSize()
@@ -441,6 +472,7 @@ fun LibraryScreen(
                                 onSectionViewAllClick = onSectionViewAllClick,
                                 onPosterLongClick = onPosterLongClick,
                                 onDisintegrated = disintegration::onExited,
+                                firstPosterFocusRequester = libraryFirstPosterFocusRequester,
                             )
                             LibraryLayoutMode.VERTICAL -> libraryVerticalContent(
                                 projection = verticalProjection,
@@ -449,11 +481,13 @@ fun LibraryScreen(
                                 fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 onPosterClick = onPosterClick,
                                 onPosterLongClick = onPosterLongClick,
+                                firstPosterFocusRequester = libraryFirstPosterFocusRequester,
                             )
                         }
                     }
                 }
             }
+        }
         }
     }
 }
@@ -1192,7 +1226,9 @@ private fun LazyListScope.librarySections(
     onSectionViewAllClick: ((LibrarySection, LibrarySortOption) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
     onDisintegrated: (String) -> Unit,
+    firstPosterFocusRequester: FocusRequester? = null,
 ) {
+    val firstEntryGlobalKey = displaySections.firstOrNull()?.previewEntries?.firstOrNull()?.globalKey
     items(
         items = displaySections,
         key = { section -> "library-horizontal:${section.type}" },
@@ -1213,6 +1249,7 @@ private fun LazyListScope.librarySections(
             val item = entry.item
             val posterItem = item.toMetaPreview()
             val entrySource = entry.section
+            val isFirstPoster = firstPosterFocusRequester != null && entry.globalKey == firstEntryGlobalKey
             DisintegratingContainer(
                 disintegrating = entry.exiting,
                 onDisintegrated = { onDisintegrated(entry.globalKey) },
@@ -1230,6 +1267,7 @@ private fun LazyListScope.librarySections(
                     } else {
                         onPosterLongClick?.let { { it(item, entrySource) } }
                     },
+                    focusRequester = if (isFirstPoster) firstPosterFocusRequester else null,
                 )
             }
         }

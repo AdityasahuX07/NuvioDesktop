@@ -474,6 +474,7 @@ const settingToastLabel = command => {
 const volumeToastLabel = (fallbackDelta = 0) => {
   const volumeLevel = state.volumeLevel;
   if (typeof volumeLevel === "number" && Number.isFinite(volumeLevel)) {
+    if (volumeLevel <= 0) return "Muted";
     return `Volume ${Math.round(Math.max(0, Math.min(1, volumeLevel)) * 100)}%`;
   }
   return fallbackDelta < 0 ? "Volume down" : "Volume up";
@@ -519,19 +520,24 @@ const showCommandToast = command => {
   if (seekLabel) {
     showPlayerToast(seekLabel);
   }
+  if (command === "keyboardToggleMute") {
+    pendingVolumeToast = true;
+  }
 };
 
 const queueSettingToast = command => {
-  if (command !== "resize" && command !== "speed") return;
-  pendingSettingToastCommand = command;
+  const isSpeedCommand = command === "speed" || command.startsWith("keyboardSpeed");
+  if (command !== "resize" && !isSpeedCommand) return;
+  const mappedCommand = isSpeedCommand ? "speed" : command;
+  pendingSettingToastCommand = mappedCommand;
   pendingSettingToastToken += 1;
   const token = pendingSettingToastToken;
   window.setTimeout(() => {
-    if (pendingSettingToastCommand !== command || pendingSettingToastToken !== token) return;
-    showPlayerToast(settingToastLabel(command));
+    if (pendingSettingToastCommand !== mappedCommand || pendingSettingToastToken !== token) return;
+    showPlayerToast(settingToastLabel(mappedCommand));
   }, 900);
   window.setTimeout(() => {
-    if (pendingSettingToastCommand !== command || pendingSettingToastToken !== token) return;
+    if (pendingSettingToastCommand !== mappedCommand || pendingSettingToastToken !== token) return;
     pendingSettingToastCommand = "";
   }, 2500);
 };
@@ -967,10 +973,13 @@ const renderAudioTrackList = () => {
     const row = document.createElement("button");
     row.type = "button";
     row.className = `track-row audio-track-row${track.selected ? " selected" : ""}`;
+    row.dataset.trackId = trackIdValue(track);
     row.addEventListener("click", event => {
       event.stopPropagation();
       send("selectAudioTrack", trackIdValue(track));
-      window.setTimeout(closePlayerModal, 120);
+      if (event.isTrusted || (event.pointerType || event.type === 'click' && event.detail !== 0)) {
+         window.setTimeout(closePlayerModal, 120);
+      }
     });
     const copy = document.createElement("span");
     copy.className = "audio-track-copy";
@@ -1534,6 +1543,7 @@ const renderSourceVirtualRows = () => {
       send("selectSource", Number(selected.index) || 0);
       window.setTimeout(closePlayerModal, 120);
     });
+    row.dataset.sourceIndex = index;
     wrapper.appendChild(row);
     fragment.appendChild(wrapper);
     rendered.push({ index, wrapper });
@@ -1797,12 +1807,32 @@ const renderP2pConsentModal = () => {
 };
 
 const renderActiveModal = () => {
+  const focusedId = document.activeElement ? document.activeElement.getAttribute("data-focus-id") : null;
   if (activeModal === "audio") renderAudioTrackList();
   if (activeModal === "subtitles") renderSubtitleModal();
   if (activeModal === "sources") renderSourceModal();
   if (activeModal === "episodes") renderEpisodesModal();
   if (activeModal === "submitIntro") renderSubmitIntroModal();
   if (activeModal === "p2pConsent") renderP2pConsentModal();
+  if (focusedId) {
+    let toFocus = document.querySelector(`[data-focus-id="${focusedId}"]`);
+    if (toFocus) {
+       toFocus.focus();
+       return;
+    }
+  }
+  if (activeModal === "subtitles" && typeof window.lastFocusedSubtitleRail === 'number' && typeof window.lastFocusedSubtitleItemIndex === 'number' && window.lastFocusedSubtitleItemIndex >= 0) {
+      const rails = [subtitleTrackList, addonSubtitleList, subtitleStyleRail];
+      const targetRail = rails[window.lastFocusedSubtitleRail];
+      if (targetRail) {
+          const items = getFocusables(targetRail);
+          const toFocus = items[window.lastFocusedSubtitleItemIndex] || items.find(el => el.classList.contains("selected"));
+          if (toFocus) {
+             toFocus.dataset.focusId = "sub-" + window.lastFocusedSubtitleRail + "-" + window.lastFocusedSubtitleItemIndex;
+             toFocus.focus();
+          }
+      }
+  }
 };
 
 window.nuvioNativeViewportChanged = () => {
@@ -2230,8 +2260,31 @@ const requestPlaybackState = (eventType, revealControls) => {
 const isInteractiveControlTarget = target => Boolean(
   target && target.closest && target.closest("button, input, textarea, select, a, [contenteditable='true']"),
 );
+// Trigger keys that both open their modal (via shortcutCommandForEvent below) and, when that
+// modal is already the active one, should close it again on a second press - so a/s/q/e toggle
+// open/closed instead of doing nothing the second time (handleModalKeydown only understands
+// arrow/enter navigation while a modal is open).
+const MODAL_TOGGLE_CODES = {
+  audio: "KeyA",
+  subtitles: "KeyS",
+  sources: "KeyQ",
+  episodes: "KeyE",
+};
+
 const shortcutCommandForEvent = event => {
-  if (event.metaKey || event.ctrlKey || event.altKey) return "";
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return "";
+  }
+  
+  if (event.shiftKey) {
+    switch (event.code) {
+      case "KeyN": return "keyboardNextEpisode";
+      case "Comma": return "keyboardSpeedDown";
+      case "Period": return "keyboardSpeedUp";
+      default: return "";
+    }
+  }
+
   switch (event.code) {
     case "Space":
     case "KeyK":
@@ -2246,6 +2299,34 @@ const shortcutCommandForEvent = event => {
       return "keyboardVolumeUp";
     case "ArrowDown":
       return "keyboardVolumeDown";
+    case "KeyA":
+      return "audio";
+    case "KeyS":
+      return "subtitles";
+    case "KeyE":
+      return "episodes";
+    case "KeyQ":
+      return "sources";
+    case "KeyV":
+      return "keyboardToggleSubtitle";
+    case "KeyB":
+      return "keyboardSequentialAudio";
+    case "Enter":
+      return "keyboardSkipIntro";
+    case "Slash":
+      return "keyboardSpeedReset";
+    case "KeyG":
+      return "keyboardSubtitleDelayDecrease";
+    case "KeyH":
+      return "keyboardSubtitleDelayIncrease";
+    case "KeyM":
+      return "keyboardToggleMute";
+    case "KeyO":
+      return "keyboardSubtitleOpacityToggle";
+    case "KeyP":
+      return "keyboardSubtitleOpacityIncrease";
+    case "KeyI":
+      return "keyboardSubtitleOpacityDecrease";
     default:
       return "";
   }
@@ -2380,6 +2461,10 @@ const clearPressedButton = () => {
   pressedButton = null;
 };
 
+document.addEventListener("contextmenu", event => {
+  event.preventDefault();
+}, true);
+
 document.addEventListener("pointerdown", event => {
   if (event.button === 3) {
     showCommandToast("seekBack");
@@ -2390,6 +2475,19 @@ document.addEventListener("pointerdown", event => {
     send("seekForward", 0);
     return;
   }
+  if (event.button === 2) {
+    send("keyboardToggle", 0);
+    event.preventDefault();
+    return;
+  }
+  
+  if (event.button === 0 && !isChromeInteractionTarget(event.target)) {
+    window.holdToSpeedTimer = setTimeout(() => {
+      send("keyboardActivateHoldToSpeed", 0);
+      window.isHoldingToSpeed = true;
+    }, 500);
+  }
+
   const interactingWithChrome = isChromeInteractionTarget(event.target);
   if (interactingWithChrome) {
     isChromePointerDown = true;
@@ -2409,6 +2507,14 @@ document.addEventListener("pointerdown", event => {
   button.classList.add("is-pressed");
 }, true);
 
+document.addEventListener("wheel", event => {
+  if (event.deltaY < 0) {
+    sendKeyboardVolume(1);
+  } else if (event.deltaY > 0) {
+    sendKeyboardVolume(-1);
+  }
+}, true);
+
 document.addEventListener("pointermove", event => {
   noteCursorActivity();
   const inside = isChromeInteractionTarget(event.target);
@@ -2418,9 +2524,37 @@ document.addEventListener("pointermove", event => {
   }
 }, true);
 
-document.addEventListener("pointerup", finishChromePointerInteraction, true);
-document.addEventListener("pointercancel", finishChromePointerInteraction, true);
-document.addEventListener("dragend", clearPressedButton, true);
+const cancelHoldToSpeed = () => {
+  if (window.holdToSpeedTimer) {
+    clearTimeout(window.holdToSpeedTimer);
+    window.holdToSpeedTimer = null;
+  }
+  if (window.spaceHoldTimer) {
+    clearTimeout(window.spaceHoldTimer);
+    window.spaceHoldTimer = null;
+  }
+  if (window.isHoldingToSpeed) {
+    send("keyboardDeactivateHoldToSpeed", 0);
+    window.isHoldingToSpeed = false;
+  }
+  if (window.isSpaceHoldingToSpeed) {
+    send("keyboardDeactivateHoldToSpeed", 0);
+    window.isSpaceHoldingToSpeed = false;
+  }
+};
+
+document.addEventListener("pointerup", (event) => {
+  cancelHoldToSpeed();
+  finishChromePointerInteraction(event);
+}, true);
+document.addEventListener("pointercancel", (event) => {
+  cancelHoldToSpeed();
+  finishChromePointerInteraction(event);
+}, true);
+document.addEventListener("dragend", (event) => {
+  cancelHoldToSpeed();
+  clearPressedButton(event);
+}, true);
 document.addEventListener("pointerleave", () => {
   updateChromePointerInside(false);
 }, true);
@@ -2927,7 +3061,7 @@ root.addEventListener("click", event => {
   if (playbackErrorText() || isControlsSurfaceEvent(event)) return;
   window.clearTimeout(tapTimer);
   tapTimer = window.setTimeout(() => {
-    requestPlaybackState("setPlaybackStateQuiet", false);
+    toggleChrome();
   }, 220);
 });
 
@@ -2947,6 +3081,207 @@ root.addEventListener("wheel", event => {
   }
 }, { passive: false });
 
+const handleModalKeydown = event => {
+  const key = event.key;
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter"].includes(key)) return;
+
+  const getFocusables = container => Array.from(container.querySelectorAll("button:not([disabled])"));
+  
+  if (activeModal === "audio") {
+    if (key !== "ArrowUp" && key !== "ArrowDown") return;
+    event.preventDefault();
+    const items = getFocusables(audioTrackList);
+    if (items.length === 0) return;
+    let currentIndex = items.indexOf(document.activeElement);
+    if (currentIndex < 0) currentIndex = items.findIndex(el => el.classList.contains("selected"));
+    const nextIndex = key === "ArrowDown" ? 
+      (currentIndex >= 0 ? Math.min(items.length - 1, currentIndex + 1) : 0) :
+      (currentIndex >= 0 ? Math.max(0, currentIndex - 1) : items.length - 1);
+    const target = items[nextIndex];
+    if (target) {
+      target.focus();
+      target.dataset.focusId = "audio-" + nextIndex;
+      target.click();
+    }
+  } else if (activeModal === "subtitles") {
+    if (key === "Enter") {
+      if (document.activeElement && document.activeElement.tagName === "BUTTON") {
+        event.preventDefault();
+        document.activeElement.click();
+      }
+      return;
+    }
+    event.preventDefault();
+    const rails = [
+       { list: subtitleTrackList, id: "sub-lang" },
+       { list: addonSubtitleList, id: "sub-opt" },
+       { list: subtitleStyleRail, id: "sub-style" }
+    ];
+    if (!window.subtitleRailMouseTrackerAdded) {
+       rails.forEach((r, i) => {
+          if (r.list) r.list.addEventListener("mousedown", () => { 
+             window.lastFocusedSubtitleRail = i; 
+             window.lastFocusedSubtitleItemIndex = -1;
+          });
+       });
+       window.subtitleRailMouseTrackerAdded = true;
+    }
+
+    let currentRailIndex = rails.findIndex(r => r.list && r.list.contains(document.activeElement));
+    if (currentRailIndex < 0) {
+       currentRailIndex = typeof window.lastFocusedSubtitleRail === 'number' ? window.lastFocusedSubtitleRail : 1;
+    } else {
+       window.lastFocusedSubtitleRail = currentRailIndex;
+    }
+
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const nextRailIndex = key === "ArrowRight" ? 
+        Math.min(rails.length - 1, currentRailIndex + 1) : 
+        Math.max(0, currentRailIndex - 1);
+      
+      if (nextRailIndex !== currentRailIndex) {
+         window.lastFocusedSubtitleItemIndex = -1;
+      }
+      window.lastFocusedSubtitleRail = nextRailIndex;
+      const nextRail = rails[nextRailIndex];
+      const items = getFocusables(nextRail.list);
+      if (items.length > 0) {
+        let target = items.find(el => el.classList.contains("selected"));
+        if (!target) target = items.find(el => el.getAttribute("aria-pressed") === "true");
+        if (!target) target = items[0];
+        target.focus();
+        target.dataset.focusId = nextRail.id + "-leftright";
+        window.lastFocusedSubtitleItemIndex = items.indexOf(target);
+      }
+    } else if (key === "ArrowUp" || key === "ArrowDown") {
+      window.lastFocusedSubtitleRail = currentRailIndex;
+      const rail = rails[currentRailIndex];
+      const items = getFocusables(rail.list);
+      if (items.length === 0) return;
+      
+      let currentIndex = items.indexOf(document.activeElement);
+      if (currentIndex < 0 && typeof window.lastFocusedSubtitleItemIndex === 'number' && window.lastFocusedSubtitleItemIndex >= 0 && window.lastFocusedSubtitleItemIndex < items.length) {
+         currentIndex = window.lastFocusedSubtitleItemIndex;
+      }
+      if (currentIndex < 0) {
+         currentIndex = items.findIndex(el => el.classList.contains("selected"));
+      }
+      
+      const nextIndex = key === "ArrowDown" ? 
+        (currentIndex >= 0 ? Math.min(items.length - 1, currentIndex + 1) : 0) :
+        (currentIndex >= 0 ? Math.max(0, currentIndex - 1) : items.length - 1);
+      
+      const target = items[nextIndex];
+      if (target) {
+        window.lastFocusedSubtitleItemIndex = nextIndex;
+        target.focus();
+        target.dataset.focusId = rail.id + "-" + nextIndex;
+        
+        // Auto-select ONLY for languages rail (index 0)
+        if (currentRailIndex === 0) {
+           if (window.subtitleAutoSelectTimer) clearTimeout(window.subtitleAutoSelectTimer);
+           window.subtitleAutoSelectTimer = setTimeout(() => {
+              if (document.body.contains(target)) {
+                 target.click();
+                 if (window.subtitleFocusTimer) clearTimeout(window.subtitleFocusTimer);
+                 window.subtitleFocusTimer = setTimeout(() => {
+                    if (document.activeElement === document.body || document.activeElement === document.documentElement) {
+                       const newItems = getFocusables(rail.list);
+                       const newTarget = newItems[nextIndex] || newItems.find(el => el.classList.contains("selected"));
+                       if (newTarget) {
+                          newTarget.dataset.focusId = rail.id + "-" + nextIndex;
+                          newTarget.focus();
+                          window.lastFocusedSubtitleItemIndex = nextIndex;
+                       }
+                    }
+                 }, 10);
+              }
+           }, 150);
+        }
+      }
+    }
+  } else if (activeModal === "sources" || activeModal === "episodes") {
+    if (key === "Enter") {
+      if (document.activeElement && document.activeElement.tagName === "BUTTON") {
+        event.preventDefault();
+        document.activeElement.click();
+      }
+      return;
+    }
+    event.preventDefault();
+
+    const isSources = activeModal === "sources";
+    let filterContainer = isSources ? sourceFilterList : episodeStreamFilterList;
+    if (!isSources && typeof episodeStreamsView !== 'undefined' && episodeStreamsView.hidden) {
+       filterContainer = seasonFilterList;
+    }
+    let listContainer = isSources ? sourceList : episodeStreamList;
+    if (!isSources && typeof episodeStreamsView !== 'undefined' && episodeStreamsView.hidden) {
+       listContainer = episodeList;
+    }
+
+    if (key === "ArrowLeft" || key === "ArrowRight") {
+      const filters = getFocusables(filterContainer);
+      if (filters.length === 0) return;
+      let currentIndex = filters.indexOf(document.activeElement);
+      if (currentIndex < 0) currentIndex = filters.findIndex(el => el.classList.contains("selected"));
+      const nextIndex = key === "ArrowRight" ? 
+        (currentIndex >= 0 ? Math.min(filters.length - 1, currentIndex + 1) : 0) :
+        (currentIndex >= 0 ? Math.max(0, currentIndex - 1) : filters.length - 1);
+        
+      const target = filters[nextIndex];
+      if (target) {
+        target.focus();
+        target.dataset.focusId = "filter-" + nextIndex;
+        target.click();
+      }
+    } else if (key === "ArrowUp" || key === "ArrowDown") {
+      if (isSources) {
+        let currentIndex = -1;
+        if (document.activeElement && document.activeElement.dataset.sourceIndex) {
+          currentIndex = parseInt(document.activeElement.dataset.sourceIndex, 10);
+        } else if (sourceVirtualItems) {
+           currentIndex = sourceVirtualItems.findIndex(item => item.isCurrent);
+        }
+        
+        const count = sourceVirtualItems ? sourceVirtualItems.length : 0;
+        if (count === 0) return;
+        const nextIndex = key === "ArrowDown" ? 
+            (currentIndex >= 0 ? Math.min(count - 1, currentIndex + 1) : 0) :
+            (currentIndex >= 0 ? Math.max(0, currentIndex - 1) : count - 1);
+        
+        const offset = (sourceVirtualOffsets && sourceVirtualOffsets[nextIndex]) ? sourceVirtualOffsets[nextIndex] : (nextIndex * 60);
+        listContainer.scrollTop = Math.max(0, offset - (listContainer.clientHeight / 2));
+        
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            const target = listContainer.querySelector(`[data-source-index="${nextIndex}"]`);
+            if (target) {
+              target.focus();
+              target.dataset.focusId = "source-" + nextIndex;
+            }
+          });
+        });
+      } else {
+        const items = getFocusables(listContainer);
+        if (items.length === 0) return;
+        let currentIndex = items.indexOf(document.activeElement);
+        if (currentIndex < 0) currentIndex = items.findIndex(el => el.classList.contains("selected"));
+        if (currentIndex < 0) currentIndex = items.findIndex(el => el.getAttribute("aria-current") === "true");
+        
+        const nextIndex = key === "ArrowDown" ? 
+          (currentIndex >= 0 ? Math.min(items.length - 1, currentIndex + 1) : 0) :
+          (currentIndex >= 0 ? Math.max(0, currentIndex - 1) : items.length - 1);
+        const target = items[nextIndex];
+        if (target) {
+          target.focus();
+          target.dataset.focusId = "ep-item-" + nextIndex;
+        }
+      }
+    }
+  }
+};
+
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && activeModal) {
     event.preventDefault();
@@ -2956,26 +3291,53 @@ document.addEventListener("keydown", event => {
   }
   if (event.key === "Escape") {
     event.preventDefault();
-    if (state.isFullscreen) {
-      togglePlayerFullscreen();
-    } else {
-      send("back", 0);
-    }
+    // Esc always closes the player, whether or not the app window happens to be fullscreen -
+    // fullscreen is a window-level state independent of player navigation (F11/F toggle it,
+    // and it's meant to persist across screens), so Esc shouldn't spend its first press just
+    // exiting fullscreen and require a second press to actually leave the player.
+    send("back", 0);
     return;
   }
   if (playbackErrorText()) return;
   const isMacFullscreenShortcut = event.code === "KeyF" && event.metaKey && event.ctrlKey && !event.altKey;
-  if (event.code === "F11" || isMacFullscreenShortcut) {
+  if (event.code === "F11" || (event.code === "KeyF" && !isTextEntryTarget(event.target)) || isMacFullscreenShortcut) {
     event.preventDefault();
     focusShortcutRoot();
     togglePlayerFullscreen();
     return;
   }
-  if (activeModal || isTextEntryTarget(event.target)) {
+  if (activeModal) {
+    const noModifiers = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    if (noModifiers && MODAL_TOGGLE_CODES[activeModal] === event.code) {
+      event.preventDefault();
+      closePlayerModal(true);
+      focusShortcutRoot();
+      return;
+    }
+    handleModalKeydown(event);
     return;
   }
+  if (isTextEntryTarget(event.target)) {
+    return;
+  }
+  if (event.code === "Space" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    if (!event.repeat && !window.spaceHoldTimer) {
+      window.spaceHoldTimer = setTimeout(() => {
+        send("keyboardActivateHoldToSpeed", 0);
+        window.isSpaceHoldingToSpeed = true;
+      }, 500);
+    }
+    return;
+  }
+
   const command = shortcutCommandForEvent(event);
   if (!command) {
+    return;
+  }
+  // Episodes panel is series-only - state.showEpisodes mirrors the same isSeries check that
+  // hides the Episodes action button for movies, so the "E" shortcut shouldn't bypass it.
+  if (command === "episodes" && !state.showEpisodes) {
     return;
   }
   event.preventDefault();
@@ -2993,8 +3355,41 @@ document.addEventListener("keydown", event => {
     requestPlaybackState("setPlaybackStateQuiet", false);
     return;
   }
+  if (command === "audio" || command === "subtitles") {
+    openPlayerModal(command);
+    return;
+  }
+  if (command === "sources") {
+    sourceFilterId = "";
+    openPlayerModal("sources");
+    send("sources", 0);
+    return;
+  }
+  if (command === "episodes") {
+    episodeStreamFilterId = "";
+    openPlayerModal("episodes");
+    send("episodes", 0);
+    return;
+  }
   showCommandToast(command);
   send(command, 0);
+});
+
+document.addEventListener("keyup", event => {
+  if (event.code === "Space" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (window.spaceHoldTimer) {
+      clearTimeout(window.spaceHoldTimer);
+      window.spaceHoldTimer = null;
+    }
+    if (window.isSpaceHoldingToSpeed) {
+      send("keyboardDeactivateHoldToSpeed", 0);
+      window.isSpaceHoldingToSpeed = false;
+    } else {
+      if (!isTextEntryTarget(event.target)) {
+        requestPlaybackState("setPlaybackStateQuiet", false);
+      }
+    }
+  }
 });
 
 setProgress(0, 0);

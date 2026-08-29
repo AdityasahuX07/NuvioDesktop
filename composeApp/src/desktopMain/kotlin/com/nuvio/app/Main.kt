@@ -17,6 +17,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.deeplink.handleAppUrl
+import com.nuvio.app.core.ui.installDesktopNavigationShortcuts
 import com.nuvio.app.core.diagnostics.SentryInitializer
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.features.discordrpc.DiscordPresenceManager
@@ -196,9 +197,11 @@ fun main(args: Array<String>) {
                     },
                 )
                 val uninstallFullscreenShortcuts = installDesktopAppFullscreenShortcuts(window)
+                val uninstallNavigationShortcuts = installDesktopNavigationShortcuts()
                 onDispose {
                     fullscreenController.dispose(window)
                     uninstallFullscreenShortcuts()
+                    uninstallNavigationShortcuts()
                     unregisterFullscreenToggle()
                 }
             }

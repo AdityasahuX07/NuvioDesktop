@@ -99,6 +99,7 @@ internal class NativePlayerController(
     private var pendingSubtitleDelayMs: Int? = null
     private var pendingSubtitleStyle: SubtitleStyleState? = null
     private var pendingUseLibass: Boolean = false
+    private var preMuteVolumeLevel: Float = 1f
     private var lastSentControlsStructureKey: NativeControlsStructureKey? = null
     private var onAction: (PlayerControlsAction) -> Boolean = { false }
     private var onEvent: (String, Double) -> Boolean = { _, _ -> false }
@@ -108,6 +109,13 @@ internal class NativePlayerController(
         SwingUtilities.invokeLater {
             handlePlayerEvent(type, value)
         }
+    }
+
+    init {
+        // Re-request keyboard focus whenever the app window comes back into OS focus (e.g. after
+        // alt-tabbing away and back). Otherwise shortcuts stay dead until the user clicks the
+        // video, since nothing else reclaims focus for the Canvas / native controls surface.
+        host.onWindowFocusGained = { requestKeyboardFocus() }
     }
 
     fun attach(
@@ -536,8 +544,22 @@ internal class NativePlayerController(
             PlayerControlsAction.KeyboardSeekForward -> fallbackSeekBy(10_000L)
             PlayerControlsAction.KeyboardVolumeDown -> adjustFallbackVolume(-5f)
             PlayerControlsAction.KeyboardVolumeUp -> adjustFallbackVolume(5f)
+            PlayerControlsAction.KeyboardToggleMute -> toggleFallbackMute()
             PlayerControlsAction.Speed -> cycleFallbackSpeed()
             else -> Unit
+        }
+    }
+
+    private fun toggleFallbackMute() {
+        val current = handle
+        if (current != 0L) {
+            val currentLevel = controlsState.volumeLevel ?: NativePlayerBridge.volume(current).coerceIn(0f, 1f)
+            if (currentLevel > 0f) {
+                preMuteVolumeLevel = currentLevel
+                setFallbackVolume(0f)
+            } else {
+                setFallbackVolume(if (preMuteVolumeLevel > 0f) preMuteVolumeLevel else 1f)
+            }
         }
     }
 
@@ -1143,6 +1165,21 @@ private fun String.toPlayerControlsAction(): PlayerControlsAction? =
         "external" -> PlayerControlsAction.OpenExternalPlayer
         "submitIntro" -> PlayerControlsAction.SubmitIntro
         "videoSettings" -> PlayerControlsAction.VideoSettings
+        "keyboardToggleSubtitle" -> PlayerControlsAction.KeyboardToggleSubtitle
+        "keyboardSequentialAudio" -> PlayerControlsAction.KeyboardSequentialAudio
+        "keyboardSkipIntro" -> PlayerControlsAction.KeyboardSkipIntro
+        "keyboardNextEpisode" -> PlayerControlsAction.KeyboardNextEpisode
+        "keyboardSpeedUp" -> PlayerControlsAction.KeyboardSpeedUp
+        "keyboardSpeedDown" -> PlayerControlsAction.KeyboardSpeedDown
+        "keyboardSpeedReset" -> PlayerControlsAction.KeyboardSpeedReset
+        "keyboardSubtitleDelayDecrease" -> PlayerControlsAction.KeyboardSubtitleDelayDecrease
+        "keyboardSubtitleDelayIncrease" -> PlayerControlsAction.KeyboardSubtitleDelayIncrease
+        "keyboardToggleMute" -> PlayerControlsAction.KeyboardToggleMute
+        "keyboardSubtitleOpacityToggle" -> PlayerControlsAction.KeyboardSubtitleOpacityToggle
+        "keyboardSubtitleOpacityIncrease" -> PlayerControlsAction.KeyboardSubtitleOpacityIncrease
+        "keyboardSubtitleOpacityDecrease" -> PlayerControlsAction.KeyboardSubtitleOpacityDecrease
+        "keyboardActivateHoldToSpeed" -> PlayerControlsAction.KeyboardActivateHoldToSpeed
+        "keyboardDeactivateHoldToSpeed" -> PlayerControlsAction.KeyboardDeactivateHoldToSpeed
         else -> null
     }
 

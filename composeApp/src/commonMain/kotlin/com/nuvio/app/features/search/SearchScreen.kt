@@ -23,22 +23,31 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.LocalStickyHeaderInsetPx
+import com.nuvio.app.core.ui.focus.StickyHeaderExtraGap
+import com.nuvio.app.core.ui.focus.RegisterDpadNavActivation
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
@@ -47,6 +56,7 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
+import com.nuvio.app.core.ui.reportsDesktopTextInputFocus
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -119,6 +129,12 @@ fun SearchScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
+    val discoverFirstPosterFocusRequester = remember { FocusRequester() }
+    var discoverHasRequestedInitialFocus by remember { mutableStateOf(false) }
+    val searchNavCoroutineScope = rememberCoroutineScope()
+    var searchStickyHeaderHeightPx by remember { mutableStateOf(0) }
+    val searchStickyHeaderExtraGapPx = with(LocalDensity.current) { StickyHeaderExtraGap.roundToPx() }
+
     val discoverInFocus by remember(query, listState) {
         derivedStateOf {
             query.isBlank() && listState.firstVisibleItemIndex > 0
@@ -128,6 +144,40 @@ fun SearchScreen(
     LaunchedEffect(scrollToTopRequests) {
         scrollToTopRequests.collect {
             listState.animateScrollToItem(0)
+        }
+    }
+
+    RegisterDpadNavActivation("Search") {
+        if (discoverHasRequestedInitialFocus || query.isNotBlank() || discoverUiState.items.isEmpty()) {
+            false
+        } else {
+            discoverHasRequestedInitialFocus = true
+            // Recent searches (if present) push the Discover section further down the LazyColumn -
+            // scroll it into view first, then request focus on Discover's first poster. Scrolling
+            // is async, so this consumes the key press optimistically and finishes on its own.
+            searchNavCoroutineScope.launch {
+                val discoverStartIndex = 1 + (if (recentSearches.isNotEmpty()) 1 else 0)
+                val firstPosterRowIndex = discoverStartIndex + 2 +
+                    (if (discoverUiState.selectedCatalog != null) 1 else 0)
+                // scrollToItem(index, scrollOffset=0) aligns the item's top with y=0 of the list's
+                // own scrollable content - but the search box above is a real `stickyHeader`,
+                // pinned as an overlay on top of that same content rather than shrinking the
+                // viewport, so an item at y=0 renders directly underneath it. A negative
+                // scrollOffset pushes the item further down into the viewport (by that many
+                // pixels) instead of scrolling all the way to the very top, landing it just below
+                // the header. (Complements, rather than replaces, the general
+                // LocalStickyHeaderInsetPx-aware bring-into-view on the poster itself below -
+                // this one gets the *initial* activation scroll right in one shot instead of
+                // relying purely on the follow-up correction.)
+                runCatching {
+                    listState.animateScrollToItem(
+                        index = firstPosterRowIndex,
+                        scrollOffset = -(searchStickyHeaderHeightPx + searchStickyHeaderExtraGapPx),
+                    )
+                }
+                runCatching { discoverFirstPosterFocusRequester.requestFocus() }
+            }
+            true
         }
     }
 
@@ -243,14 +293,23 @@ fun SearchScreen(
             else -> stringResource(Res.string.compose_nav_search)
         }
 
+        CompositionLocalProvider(
+            LocalStickyHeaderInsetPx provides (searchStickyHeaderHeightPx + searchStickyHeaderExtraGapPx),
+        ) {
         NuvioScreen(
             horizontalPadding = 0.dp,
             topPadding = if (topChromePadding != null) 0.dp else null,
             listState = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().dpadNavigationContainer(),
         ) {
         stickyHeader {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        searchStickyHeaderHeightPx = coordinates.size.height
+                    },
+            ) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -271,7 +330,9 @@ fun SearchScreen(
                             value = query,
                             onValueChange = { query = it },
                             placeholder = stringResource(Res.string.compose_search_placeholder),
-                            modifier = Modifier.focusRequester(focusRequester),
+                            modifier = Modifier
+                                .focusRequester(focusRequester)
+                                .reportsDesktopTextInputFocus(),
                             trailingContent = if (query.isNotBlank()) {
                                 {
                                     IconButton(onClick = { query = "" }) {
@@ -320,6 +381,7 @@ fun SearchScreen(
                     fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     onPosterClick = onPosterClick,
                     onPosterLongClick = onPosterLongClick,
+                    firstPosterFocusRequester = discoverFirstPosterFocusRequester,
                 )
             } else {
                 val normalizedQuery = query.trim()
@@ -387,6 +449,7 @@ fun SearchScreen(
                     }
                 }
             }
+        }
         }
     }
 }

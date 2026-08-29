@@ -579,7 +579,10 @@ fun runtimeConfigBoolean(key: String, default: Boolean): Boolean =
 
 val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generateRuntimeConfigs") {
     outputDir.set(generatedRuntimeConfigDir)
-    localPropertiesFile.set(rootProject.layout.projectDirectory.file("local.properties"))
+    val localProps = rootProject.layout.projectDirectory.file("local.properties")
+    if (localProps.asFile.exists()) {
+        localPropertiesFile.set(localProps)
+    }
     appVersionName.set(releaseAppVersionName)
     appVersionCode.set(releaseAppVersionCode)
     desktopAppVersionName.set(desktopReleaseVersionName)
@@ -808,7 +811,11 @@ val windowsVcvarsRelativePath = when (windowsPlayerBridgeArch) {
 }
 val windowsVcvarsPath = providers.gradleProperty("nuvio.windows.vcvars.path").orNull
     ?.takeIf { it.isNotBlank() }
-val windowsPlayerBridgeJavaHome = providers.systemProperty("java.home").get()
+val windowsPlayerBridgeJavaHome = listOfNotNull(
+    System.getenv("JAVA_HOME"),
+    providers.systemProperty("java.home").orNull,
+    "C:/Program Files/Java/jdk-17"
+).firstOrNull { File(it, "include/jni.h").exists() } ?: providers.systemProperty("java.home").get()
 val missingWindowsPlayerBridgeInputs = listOfNotNull(
     "WebView2.h".takeUnless { windowsWebView2IncludeDir.resolve("WebView2.h").exists() },
     "WebView2Loader.dll.lib".takeUnless { windowsWebView2LoaderLib.exists() },
@@ -914,7 +921,8 @@ val buildWindowsPlayerBridge = tasks.register<Exec>("buildWindowsPlayerBridge") 
     outputs.file(windowsPlayerBridgeOutput)
     outputs.file(windowsPlayerBridgeImportLib)
     outputs.file(windowsPlayerBridgePdb)
-    onlyIf { !windowsPlayerBridgeOutput.get().asFile.exists() }
+    val output = windowsPlayerBridgeOutput.get().asFile
+    onlyIf { !output.exists() }
     commandLine(windowsPlayerBridgeCommand)
 }
 

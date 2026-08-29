@@ -34,6 +34,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +55,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -71,6 +75,15 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
@@ -105,6 +118,9 @@ import org.jetbrains.compose.resources.stringResource
 // ---------------------------------------------------------------------------
 // Streams Screen
 // ---------------------------------------------------------------------------
+
+internal val LocalExplicitFocusedStreamIndex = compositionLocalOf<Int> { -1 }
+internal val LocalFlatStreams = compositionLocalOf<List<StreamItem>> { emptyList() }
 
 @Composable
 fun StreamsScreen(
@@ -249,12 +265,142 @@ fun StreamsScreen(
         )
     }
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    val groupsWithContent = remember(uiState.groups) {
+        uiState.groups.filter { it.streams.isNotEmpty() || it.isLoading }
+    }
+    val filterOptions: List<String?> = remember(groupsWithContent) {
+        listOf(null) + groupsWithContent.map { it.addonId }
+    }
+
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val listCoroutineScope = rememberCoroutineScope()
+
+    val streamSections = remember(uiState.filteredGroups) {
+        buildStreamSectionRenderModels(uiState.filteredGroups)
+    }
+
+    val flatStreams = remember(streamSections) {
+        streamSections.flatMap { section -> section.sources.flatMap { it.streams.map { renderModel -> renderModel.stream } } }
+    }
+
+    val streamIndexToLazyListIndex = remember(streamSections, uiState.selectedFilter, uiState.filteredGroups) {
+        val map = mutableMapOf<Int, Int>()
+        val hasGroups = uiState.filteredGroups.isNotEmpty()
+        val hasAnyStreams = uiState.filteredGroups.any { it.streams.isNotEmpty() }
+        val anyLoading = uiState.filteredGroups.any { it.isLoading }
+
+        if (!((hasGroups && anyLoading && !hasAnyStreams) || (!hasAnyStreams && !uiState.isAnyLoading))) {
+            var flatIndex = 0
+            var lazyListIndex = 0
+            streamSections.forEach { section ->
+                val showHeader = uiState.selectedFilter == null
+                if (showHeader) lazyListIndex++
+                
+                section.sources.forEach { source ->
+                    if (section.showSourceHeaders) lazyListIndex++
+                    
+                    source.streams.forEach { _ ->
+                        map[flatIndex] = lazyListIndex
+                        flatIndex++
+                        lazyListIndex++
+                    }
+                }
+            }
+        }
+        map
+    }
+
+    var explicitlyFocusedStreamIndex by remember { mutableStateOf(-1) }
+    LaunchedEffect(uiState.selectedFilter, uiState.groups) {
+        explicitlyFocusedStreamIndex = -1
+        focusRequester.requestFocus()
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionLeft -> {
+                            explicitlyFocusedStreamIndex = -1
+                            val currentIndex = filterOptions.indexOf(uiState.selectedFilter)
+                            if (currentIndex > 0) {
+                                StreamsRepository.selectFilter(filterOptions[currentIndex - 1])
+                            }
+                            true
+                        }
+                        Key.DirectionRight -> {
+                            explicitlyFocusedStreamIndex = -1
+                            val currentIndex = filterOptions.indexOf(uiState.selectedFilter)
+                            if (currentIndex >= 0 && currentIndex < filterOptions.size - 1) {
+                                StreamsRepository.selectFilter(filterOptions[currentIndex + 1])
+                            }
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            if (explicitlyFocusedStreamIndex < flatStreams.size - 1) {
+                                explicitlyFocusedStreamIndex++
+                                streamIndexToLazyListIndex[explicitlyFocusedStreamIndex]?.let { lazyIndex ->
+                                    listCoroutineScope.launch {
+                                        listState.bringItemIntoView(lazyIndex)
+                                    }
+                                }
+                            }
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            if (explicitlyFocusedStreamIndex > 0) {
+                                explicitlyFocusedStreamIndex--
+                                streamIndexToLazyListIndex[explicitlyFocusedStreamIndex]?.let { lazyIndex ->
+                                    listCoroutineScope.launch {
+                                        listState.bringItemIntoView(lazyIndex)
+                                    }
+                                }
+                            } else if (explicitlyFocusedStreamIndex == -1 && flatStreams.isNotEmpty()) {
+                                explicitlyFocusedStreamIndex = 0
+                                streamIndexToLazyListIndex[explicitlyFocusedStreamIndex]?.let { lazyIndex ->
+                                    listCoroutineScope.launch {
+                                        listState.bringItemIntoView(lazyIndex)
+                                    }
+                                }
+                            }
+                            true
+                        }
+                        Key.Enter, Key.NumPadEnter -> {
+                            if (explicitlyFocusedStreamIndex in flatStreams.indices) {
+                                val stream = flatStreams[explicitlyFocusedStreamIndex]
+                                val isSelectable = stream.isSelectableForPlayback(debridSettings.canResolvePlayableLinks)
+                                if (isSelectable) {
+                                    onStreamSelected(stream, effectiveResumePositionMs, effectiveResumeProgressFraction)
+                                }
+                            }
+                            true
+                        }
+                        Key.R -> {
+                            reloadStreams()
+                            true
+                        }
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            },
     ) {
-        val isTabletLayout = maxWidth >= 768.dp
+        CompositionLocalProvider(
+            LocalExplicitFocusedStreamIndex provides explicitlyFocusedStreamIndex,
+            LocalFlatStreams provides flatStreams,
+        ) {
+            val isTabletLayout = maxWidth >= 768.dp
 
         if (isTabletLayout) {
             TabletStreamsLayout(
@@ -277,6 +423,8 @@ fun StreamsScreen(
                 },
                 onStreamLongPress = { stream -> streamActionsTarget = stream },
                 onRefresh = reloadStreams,
+                listState = listState,
+                streamSections = streamSections,
             )
         } else {
             MobileStreamsLayout(
@@ -298,6 +446,8 @@ fun StreamsScreen(
                 },
                 onStreamLongPress = { stream -> streamActionsTarget = stream },
                 onRefresh = reloadStreams,
+                listState = listState,
+                streamSections = streamSections,
             )
         }
 
@@ -471,6 +621,7 @@ fun StreamsScreen(
                 )
             },
         )
+        }
     }
 }
 
@@ -492,6 +643,8 @@ private fun MobileStreamsLayout(
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     onRefresh: () -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    streamSections: List<StreamSectionRenderModel>,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -576,6 +729,8 @@ private fun MobileStreamsLayout(
                         onStreamLongPress = onStreamLongPress,
                         resumePositionMs = resumePositionMs,
                         resumeProgressFraction = resumeProgressFraction,
+                        listState = listState,
+                        streamSections = streamSections,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -904,20 +1059,20 @@ private const val STREAM_CONTENT_TYPE_STREAM = "streams_stream"
 private const val STREAM_CONTENT_TYPE_FOOTER_LOADING = "streams_footer_loading"
 private const val STREAM_CONTENT_TYPE_BOTTOM_SPACER = "streams_bottom_spacer"
 
-private data class StreamSectionRenderModel(
+internal data class StreamSectionRenderModel(
     val sectionKey: String,
     val group: AddonStreamGroup,
     val sources: List<StreamSourceRenderModel>,
     val showSourceHeaders: Boolean,
 )
 
-private data class StreamSourceRenderModel(
+internal data class StreamSourceRenderModel(
     val sourceKey: String,
     val sourceName: String,
     val streams: List<StreamCardRenderModel>,
 )
 
-private data class StreamCardRenderModel(
+internal data class StreamCardRenderModel(
     val lazyKey: String,
     val stream: StreamItem,
 )
@@ -931,26 +1086,29 @@ internal fun StreamList(
     onStreamLongPress: (StreamItem) -> Unit,
     resumePositionMs: Long?,
     resumeProgressFraction: Float?,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    streamSections: List<StreamSectionRenderModel>,
     modifier: Modifier = Modifier,
 ) {
     val filteredGroups = uiState.filteredGroups
     val hasGroups = filteredGroups.isNotEmpty()
     val hasAnyStreams = filteredGroups.any { it.streams.isNotEmpty() }
     val anyLoading = filteredGroups.any { it.isLoading }
-    val streamSections = remember(filteredGroups) {
-        buildStreamSectionRenderModels(filteredGroups)
-    }
     val torrentNotSupportedText = stringResource(Res.string.streams_torrent_not_supported)
-    val listState = rememberLazyListState()
     val streamBadgeSettings by remember {
         StreamBadgeSettingsRepository.ensureLoaded()
         StreamBadgeSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
 
+    val listFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) {
+        listFocusRequester.requestFocus()
+    }
+
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().focusRequester(listFocusRequester).focusGroup(),
             contentPadding = PaddingValues(
                 horizontal = 12.dp,
                 vertical = 12.dp,
@@ -1466,5 +1624,36 @@ private fun FooterLoadingBlock(modifier: Modifier = Modifier) {
             ),
             color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+internal suspend fun LazyListState.bringItemIntoView(index: Int) {
+    val visibleItems = layoutInfo.visibleItemsInfo
+    if (visibleItems.isEmpty()) return
+
+    val itemInfo = visibleItems.find { it.index == index }
+    if (itemInfo != null) {
+        val viewportStart = layoutInfo.viewportStartOffset
+        val viewportEnd = layoutInfo.viewportEndOffset
+
+        val itemStart = itemInfo.offset
+        val itemEnd = itemInfo.offset + itemInfo.size
+
+        if (itemStart < viewportStart) {
+            animateScrollBy((itemStart - viewportStart).toFloat())
+        } else if (itemEnd > viewportEnd) {
+            animateScrollBy((itemEnd - viewportEnd).toFloat())
+        }
+    } else {
+        val lastVisible = visibleItems.last()
+        val firstVisible = visibleItems.first()
+        
+        if (index > lastVisible.index) {
+            animateScrollToItem(index, scrollOffset = layoutInfo.viewportSize.height / 2)
+        } else if (index < firstVisible.index) {
+            animateScrollToItem(index, scrollOffset = layoutInfo.viewportSize.height / 2)
+        } else {
+            animateScrollToItem(index)
+        }
     }
 }

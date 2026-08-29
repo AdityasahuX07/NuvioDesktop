@@ -69,6 +69,8 @@ internal fun TabletStreamsLayout(
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     onRefresh: () -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    streamSections: List<StreamSectionRenderModel>,
     modifier: Modifier = Modifier,
 ) {
     val hazeState = rememberHazeState()
@@ -214,6 +216,8 @@ internal fun TabletStreamsLayout(
                             onStreamLongPress = onStreamLongPress,
                             resumePositionMs = resumePositionMs,
                             resumeProgressFraction = resumeProgressFraction,
+                            listState = listState,
+                            streamSections = streamSections,
                             modifier = Modifier.weight(1f),
                         )
                     }

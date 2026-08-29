@@ -2,6 +2,7 @@ package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
@@ -18,6 +19,8 @@ fun HomePosterCard(
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    focusRequester: FocusRequester? = null,
+    onFocusChanged: ((Boolean) -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
@@ -41,6 +44,8 @@ fun HomePosterCard(
             isWatched = isWatched,
             onClick = onClick,
             onLongClick = onLongClick,
+            focusRequester = focusRequester,
+            onFocusChanged = onFocusChanged,
         )
     }
 }

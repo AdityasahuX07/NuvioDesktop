@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +43,7 @@ fun HomeCollectionRowSection(
     sectionPadding: Dp? = null,
     animateGifs: Boolean = true,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
+    isFirstFocusableRow: Boolean = false,
 ) {
     if (collection.folders.isEmpty()) return
 
@@ -52,6 +54,7 @@ fun HomeCollectionRowSection(
             sectionPadding = sectionPadding,
             animateGifs = animateGifs,
             onFolderClick = onFolderClick,
+            isFirstFocusableRow = isFirstFocusableRow,
         )
     } else {
         BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -61,6 +64,7 @@ fun HomeCollectionRowSection(
                 sectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value),
                 animateGifs = animateGifs,
                 onFolderClick = onFolderClick,
+                isFirstFocusableRow = isFirstFocusableRow,
             )
         }
     }
@@ -73,7 +77,11 @@ private fun HomeCollectionRowSectionContent(
     sectionPadding: Dp,
     animateGifs: Boolean,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)?,
+    isFirstFocusableRow: Boolean = false,
 ) {
+    val homeFocusCoordinator = LocalHomeFocusCoordinator.current
+    val firstFolderId = collection.folders.firstOrNull()?.id
+
     NuvioShelfSection(
         title = collection.title,
         entries = collection.folders,
@@ -82,10 +90,19 @@ private fun HomeCollectionRowSectionContent(
         rowContentPadding = PaddingValues(horizontal = sectionPadding),
         key = { folder -> "collection_${collection.id}_folder_${folder.id}" },
     ) { folder ->
+        val isFirstFolder = isFirstFocusableRow && homeFocusCoordinator != null && folder.id == firstFolderId
         CollectionFolderCard(
             folder = folder,
             animateGifs = animateGifs,
             onClick = onFolderClick?.let { { it(collection.id, folder.id) } },
+            focusRequester = if (isFirstFolder) homeFocusCoordinator?.firstPosterFocusRequester else null,
+            // See HomeCatalogSection.kt for why this is applied directly on the first item's own
+            // modifier chain rather than on the shelf row's outer wrapper.
+            modifier = if (isFirstFolder) {
+                Modifier.focusProperties { up = homeFocusCoordinator!!.heroViewDetailsFocusRequester }
+            } else {
+                Modifier
+            },
         )
     }
 }
@@ -96,6 +113,7 @@ private fun CollectionFolderCard(
     modifier: Modifier = Modifier,
     animateGifs: Boolean = true,
     onClick: (() -> Unit)? = null,
+    focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val basePosterWidthDp = desktopCatalogShelfPosterBaseWidthDp(posterCardStyle.widthDp)
@@ -121,8 +139,8 @@ private fun CollectionFolderCard(
 
     Column(
         modifier = Modifier
-            .posterCardClickable(onClick = onClick, onLongClick = null)
             .then(modifier)
+            .posterCardClickable(onClick = onClick, onLongClick = null, focusRequester = focusRequester)
             .width(cardWidth),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

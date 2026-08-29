@@ -30,6 +30,11 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.dpadFocusGapPadding
+import com.nuvio.app.core.ui.focus.DpadFocusGap
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.nuvio.app.core.ui.DisintegrationRequest
@@ -592,7 +597,8 @@ internal fun DesktopHoverSidebar(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(y = animatedNavColumnOffset)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .dpadNavigationContainer(handleLeftRight = false),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 DesktopSidebarItem(
@@ -717,13 +723,15 @@ private fun DesktopSidebarItem(
     val tokens = MaterialTheme.nuvio
     val contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted
     val iconColor = if (selected) tokens.colors.onAccent else contentColor
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .height(DesktopSidebarItemHeight)
             .padding(horizontal = 10.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
+            .dpadFocusRing(interactionSource = interactionSource, cornerRadius = 16.dp, scale = false)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         color = Color.Transparent,
         shape = RoundedCornerShape(16.dp),
     ) {

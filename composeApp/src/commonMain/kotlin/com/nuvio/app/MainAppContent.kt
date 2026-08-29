@@ -364,6 +364,39 @@ internal fun MainAppContent(
         }
     }
 
+    fun openSearchTabFocused() {
+        if (selectedTab != AppScreenTab.Search) {
+            activateTab(AppScreenTab.Search)
+        }
+        searchFocusRequestCount++
+    }
+
+    fun handleKeyboardTabShortcut(index: Int) {
+        val tab = when (index) {
+            1 -> AppScreenTab.Home
+            2 -> AppScreenTab.Search
+            3 -> AppScreenTab.Library
+            4 -> AppScreenTab.Settings
+            else -> return
+        }
+        handleRootTabClick(tab)
+    }
+
+    DisposableEffect(Unit) {
+        val unregister = com.nuvio.app.core.ui.registerDesktopNavigationShortcutHandlers(
+            onSelectTab = ::handleKeyboardTabShortcut,
+            onOpenSearchFocused = ::openSearchTabFocused,
+        )
+        onDispose { unregister() }
+    }
+
+    DisposableEffect(selectedTab) {
+        val unregister = com.nuvio.app.core.ui.registerDesktopArrowKeyActivationHandler { direction ->
+            com.nuvio.app.core.ui.focus.DpadNavActivation.tryActivate(selectedTab.name, direction)
+        }
+        onDispose { unregister() }
+    }
+
     LaunchedEffect(
         liquidGlassNativeTabBarSupported,
         liquidGlassNativeTabBarEnabled,

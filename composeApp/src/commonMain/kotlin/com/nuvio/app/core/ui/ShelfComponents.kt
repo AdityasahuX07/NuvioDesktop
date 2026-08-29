@@ -10,6 +10,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +28,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,22 +39,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
+import com.nuvio.app.core.ui.focus.dpadFocusGapPadding
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.DpadFocusGap
+import com.nuvio.app.core.ui.focus.LocalStickyHeaderInsetPx
+import com.nuvio.app.core.ui.focus.withFocusOverflowReserve
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +80,8 @@ import nuvio.composeapp.generated.resources.poster_logo_content_description
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class NuvioPosterShape {
     Poster,
@@ -109,33 +127,76 @@ fun <T> NuvioShelfSection(
                 viewAllPillSize = viewAllPillSize,
             )
         }
+        // When the row has been horizontally scrolled and the user navigates back to the first
+        // item, snap the row back to its true start (index 0) instead of leaving it mid-scroll -
+        // otherwise the first item's focus scale/border, still offset from the row's actual
+        // start, can end up partly misaligned with the section title above it (or, at the screen
+        // edge, clipped). This only ever targets the very first item.
+        //
+        // The short delay before scrolling matters: Compose's own default "bring focused item
+        // into view" behavior (bundled into `focusable()`) also fires on this same focus change,
+        // targeting just enough scroll to reveal the item - not necessarily index 0. Both
+        // requests land on the same LazyListState, and whichever is issued *last* wins; firing
+        // ours immediately risks losing that race and ending up scrolled to wherever Compose's
+        // own version stopped. Waiting lets that default settle first, so our explicit
+        // scroll-to-start is the one that actually sticks. Driving it off a LaunchedEffect
+        // (rather than launching directly from the callback) also means a rapid focus-in/
+        // focus-out doesn't stack up multiple competing scroll jobs - the pending delay is
+        // simply cancelled if focus leaves before it fires.
+        var firstItemHasFocus by remember { mutableStateOf(false) }
+        LaunchedEffect(firstItemHasFocus) {
+            if (firstItemHasFocus) {
+                delay(120L)
+                runCatching { state.scrollToItem(0) }
+                runCatching { state.animateScrollToItem(0) }
+            }
+        }
+        val firstItemFocusModifier = Modifier.onFocusChanged { focusState ->
+            firstItemHasFocus = focusState.hasFocus
+        }
         LazyRow(
             state = state,
-            modifier = rowModifier.nuvioDesktopDragScroll(state),
-            contentPadding = rowContentPadding,
+            modifier = rowModifier
+                .nuvioDesktopDragScroll(state)
+                .dpadNavigationContainer(handleUpDown = false),
+            contentPadding = rowContentPadding.withFocusOverflowReserve(),
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
         ) {
             if (duplicateSafeEntries != null) {
-                items(
+                itemsIndexed(
                     items = duplicateSafeEntries,
-                    key = { entry -> entry.lazyKey },
-                    contentType = { "poster" },
-                ) { keyedEntry ->
-                    if (animatePlacement) {
-                        Box(modifier = Modifier.animateItem()) { itemContent(keyedEntry.value) }
+                    key = { _, entry -> entry.lazyKey },
+                    contentType = { _, _ -> "poster" },
+                ) { index, keyedEntry ->
+                    val content: @Composable () -> Unit = {
+                        if (animatePlacement) {
+                            Box(modifier = Modifier.animateItem()) { itemContent(keyedEntry.value) }
+                        } else {
+                            itemContent(keyedEntry.value)
+                        }
+                    }
+                    if (index == 0) {
+                        Box(modifier = firstItemFocusModifier) { content() }
                     } else {
-                        itemContent(keyedEntry.value)
+                        content()
                     }
                 }
             } else {
-                items(
+                itemsIndexed(
                     items = entries,
-                    contentType = { "poster" },
-                ) { entry ->
-                    if (animatePlacement) {
-                        Box(modifier = Modifier.animateItem()) { itemContent(entry) }
+                    contentType = { _, _ -> "poster" },
+                ) { index, entry ->
+                    val content: @Composable () -> Unit = {
+                        if (animatePlacement) {
+                            Box(modifier = Modifier.animateItem()) { itemContent(entry) }
+                        } else {
+                            itemContent(entry)
+                        }
+                    }
+                    if (index == 0) {
+                        Box(modifier = firstItemFocusModifier) { content() }
                     } else {
-                        itemContent(entry)
+                        content()
                     }
                 }
             }
@@ -239,6 +300,8 @@ fun NuvioPosterCard(
     isWatched: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    focusRequester: FocusRequester? = null,
+    onFocusChanged: ((Boolean) -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val tokens = MaterialTheme.nuvio
@@ -250,18 +313,56 @@ fun NuvioPosterCard(
         shape = shape,
     )
     val shouldShowTitleBelow = showTitleBelow && !posterCardStyle.hideLabelsEnabled
+    val posterInteractionSource = remember { MutableInteractionSource() }
+    val posterBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val posterBringIntoViewScope = rememberCoroutineScope()
+    var posterCardSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val stickyHeaderInsetPx = LocalStickyHeaderInsetPx.current
+    // The focusable/clickable target below is the image Box only, so Compose's automatic
+    // scroll-focused-item-into-view only guarantees the image is visible - it has no idea the
+    // title/year label below is part of the same card. Bringing this whole Column (image + label)
+    // into view explicitly whenever it gains focus keeps the label from getting cropped by the
+    // viewport edge when navigating to the last visible row. Padding the requested rect upward by
+    // the screen's sticky header height (if any - see LocalStickyHeaderInsetPx) additionally
+    // keeps the poster from ending up scrolled to directly underneath that overlay when
+    // navigating up into it.
+    val combinedOnFocusChanged: (Boolean) -> Unit = { focused ->
+        onFocusChanged?.invoke(focused)
+        if (focused) {
+            posterBringIntoViewScope.launch {
+                runCatching {
+                    posterBringIntoViewRequester.bringIntoView(
+                        Rect(
+                            left = 0f,
+                            top = -stickyHeaderInsetPx.toFloat(),
+                            right = posterCardSizePx.width.toFloat(),
+                            bottom = posterCardSizePx.height.toFloat(),
+                        ),
+                    )
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .desktopPosterHoverScale()
             .then(modifier)
-            .width(cardWidth),
+            .width(cardWidth)
+            .onSizeChanged { posterCardSizePx = it }
+            .bringIntoViewRequester(posterBringIntoViewRequester),
         verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(shape.aspectRatio)
+                .dpadFocusRing(
+                    interactionSource = posterInteractionSource,
+                    cornerRadius = posterCardStyle.cornerRadiusDp.dp,
+                    gap = DpadFocusGap,
+                )
+                .dpadFocusGapPadding(interactionSource = posterInteractionSource)
                 .clip(cardShape)
                 .background(tokens.colors.surface)
                 .nuvioCardDepth(
@@ -274,6 +375,10 @@ fun NuvioPosterCard(
                     zoomImageUrl = imageUrl,
                     zoomCornerRadius = posterCardStyle.cornerRadiusDp.dp,
                     hoverScaleEnabled = false,
+                    focusRequester = focusRequester,
+                    onFocusChanged = combinedOnFocusChanged,
+                    interactionSource = posterInteractionSource,
+                    drawFocusRing = false,
                 ),
             contentAlignment = Alignment.Center,
         ) {
@@ -558,10 +663,14 @@ internal fun Modifier.posterCardClickable(
     zoomImageUrl: String? = null,
     zoomCornerRadius: Dp = NuvioTokens.Radius.poster,
     hoverScaleEnabled: Boolean = true,
+    focusRequester: FocusRequester? = null,
+    onFocusChanged: ((Boolean) -> Unit)? = null,
+    interactionSource: MutableInteractionSource? = null,
+    drawFocusRing: Boolean = true,
 ): Modifier {
     if (onClick == null && onLongClick == null) return this
     val bounds = remember { mutableStateOf<Rect?>(null) }
-    val interactionSource = remember { MutableInteractionSource() }
+    val resolvedInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
     val handleLongClick = onLongClick?.let { longClick ->
         {
             bounds.value?.takeIf { zoomImageUrl != null }?.let { cardBounds ->
@@ -578,12 +687,30 @@ internal fun Modifier.posterCardClickable(
     }
     return this
         .onGloballyPositioned { coordinates -> bounds.value = coordinates.unclippedBoundsInRoot() }
+        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        .then(
+            if (onFocusChanged != null) {
+                Modifier.onFocusChanged { onFocusChanged(it.isFocused) }
+            } else {
+                Modifier
+            },
+        )
         .desktopPosterHoverScale(
             enabled = hoverScaleEnabled,
-            interactionSource = interactionSource,
+            interactionSource = resolvedInteractionSource,
+        )
+        .then(
+            if (drawFocusRing) {
+                Modifier.dpadFocusRing(
+                    interactionSource = resolvedInteractionSource,
+                    cornerRadius = zoomCornerRadius,
+                )
+            } else {
+                Modifier
+            },
         )
         .combinedClickable(
-            interactionSource = interactionSource,
+            interactionSource = resolvedInteractionSource,
             indication = null,
             onClick = { onClick?.invoke() },
             onLongClick = handleLongClick,

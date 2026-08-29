@@ -10,6 +10,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,9 +56,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.nuvio.app.core.ui.focus.dpadFocusRing
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +79,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.nuvio.app.navigation.LocalNativeNavigationBarHidden
 import com.nuvio.app.navigation.LocalUseNativeNavigation
+import com.nuvio.app.core.ui.reportsDesktopTextInputFocus
 
 @Composable
 fun NuvioScreen(
@@ -296,15 +301,38 @@ fun NuvioBackButton(
     buttonSize: Dp = NuvioTokens.Space.s40,
     iconSize: Dp = NuvioTokens.Icon.md,
     contentDescription: String = stringResource(Res.string.action_back),
+    // Matches the default `shape` (a circle) so the ring reads as a concentric frame around it.
+    // Callers overriding `shape` to something non-circular (e.g. a rounded-rect card shape)
+    // should pass the matching corner radius here too, or the ring stays circular while the
+    // button underneath isn't.
+    focusRingCornerRadius: Dp = NuvioTokens.Radius.full,
+    // "Back" is already bound to Esc/Backspace at the global desktop shortcut layer (see
+    // DesktopNavigationShortcuts.kt) regardless of Compose focus, so this on-screen button is
+    // never the only way to go back with a keyboard/D-pad. Screens that lay it out as the
+    // topmost item in a vertical focus group should pass `focusable = false`: otherwise Up from
+    // the item below it lands here with nowhere further to go, and depending on the screen's own
+    // key handling that can read as focus "getting stuck" instead of just stopping cleanly at the
+    // real topmost selectable item.
+    focusable: Boolean = true,
 ) {
     if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
 
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .size(buttonSize)
+            .dpadFocusRing(
+                interactionSource = interactionSource,
+                cornerRadius = focusRingCornerRadius,
+            )
+            .then(if (!focusable) Modifier.focusProperties { canFocus = false } else Modifier)
             .clip(shape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -364,7 +392,9 @@ fun NuvioInputField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .reportsDesktopTextInputFocus(),
         singleLine = true,
         shape = RoundedCornerShape(NuvioTokens.Radius.lg),
         placeholder = {

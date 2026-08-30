@@ -82,6 +82,8 @@ internal fun TabletStreamsLayout(
     onStreamLongPress: (StreamItem) -> Unit,
     onStreamSecondaryClick: (StreamItem, Offset) -> Unit,
     onRefresh: () -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    streamSections: List<StreamSectionRenderModel>,
     modifier: Modifier = Modifier,
 ) {
     if (!isDesktop) {
@@ -104,6 +106,8 @@ internal fun TabletStreamsLayout(
             onStreamLongPress = onStreamLongPress,
             onStreamSecondaryClick = onStreamSecondaryClick,
             onRefresh = onRefresh,
+            listState = listState,
+            streamSections = streamSections,
             modifier = modifier,
         )
         return
@@ -284,6 +288,8 @@ internal fun TabletStreamsLayout(
                         onStreamSecondaryClick = onStreamSecondaryClick,
                         resumePositionMs = resumePositionMs,
                         resumeProgressFraction = resumeProgressFraction,
+                        listState = listState,
+                        streamSections = streamSections,
                         modifier = Modifier.weight(1f),
                     )
                 }

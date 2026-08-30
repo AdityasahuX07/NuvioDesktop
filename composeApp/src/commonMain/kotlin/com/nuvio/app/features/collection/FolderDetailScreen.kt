@@ -22,8 +22,21 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.focusable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import com.nuvio.app.core.ui.focus.RegisterDpadNavActivation
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
 import androidx.compose.material3.LocalRippleConfiguration
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -41,31 +54,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioDesktopVerticalScrollbar
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.NuvioScreenHeader
-import com.nuvio.app.core.ui.catalogPosterBaseWidthDp
-import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
-import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
-import com.nuvio.app.core.ui.posterGridColumnCountForViewport
-import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
@@ -73,13 +77,9 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.canOpenCatalog
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
-import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomePosterHoverPreview
-import com.nuvio.app.features.home.components.homeCatalogPreviewLimitForWidth
-import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
-import com.nuvio.app.isDesktop
 import com.nuvio.app.navigation.LocalUseNativeNavigation
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -106,126 +106,13 @@ fun FolderDetailScreen(
     val folder = uiState.folder
     val useNativeNavigation = LocalUseNativeNavigation.current
     val coverImageUrl = folder?.coverImageUrl?.takeIf { it.isNotBlank() }
-
-    if (!isDesktop) {
-        MobileFolderDetailContent(
-            uiState = uiState,
-            watchedKeys = watchedUiState.watchedKeys,
-            coverImageUrl = coverImageUrl,
-            useNativeNavigation = useNativeNavigation,
-            onBack = onBack,
-            onCatalogClick = onCatalogClick,
-            onPosterClick = onPosterClick,
-        )
-        return
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        if (coverImageUrl != null) {
-            AsyncImage(
-                model = coverImageUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.06f
-                        scaleY = 1.06f
-                    }
-                    .blur(28.dp),
-                contentScale = ContentScale.Crop,
-                alpha = 0.72f,
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to MaterialTheme.colorScheme.background.copy(alpha = 0.50f),
-                            0.42f to MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
-                            1f to MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
-                        ),
-                    ),
-            )
-        }
-
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val desktopPagePadding = desktopPageHorizontalPaddingForWidth(maxWidth.value)
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (!useNativeNavigation) {
-                    NuvioScreenHeader(
-                        title = folder?.title ?: uiState.collectionTitle,
-                        modifier = Modifier.padding(horizontal = desktopPagePadding),
-                        backgroundColor = Color.Transparent,
-                        includeStatusBarPadding = false,
-                        topPadding = 32.dp,
-                        onBack = onBack,
-                    )
-                }
-
-                if (folder == null && !uiState.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.collections_folder_not_found),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    return@Column
-                }
-
-                when (uiState.viewMode) {
-                    FolderViewMode.TABBED_GRID -> TabbedGridContent(
-                        uiState = uiState,
-                        watchedKeys = watchedUiState.watchedKeys,
-                        pageHorizontalPadding = desktopPagePadding,
-                        modifier = Modifier.weight(1f),
-                        onTabSelected = { FolderDetailRepository.selectTab(it) },
-                        onPosterClick = onPosterClick,
-                    )
-                    FolderViewMode.ROWS -> RowsContent(
-                        uiState = uiState,
-                        watchedKeys = watchedUiState.watchedKeys,
-                        modifier = Modifier.weight(1f),
-                        onCatalogClick = onCatalogClick,
-                        onPosterClick = onPosterClick,
-                    )
-                    FolderViewMode.FOLLOW_LAYOUT -> RowsContent(
-                        uiState = uiState,
-                        watchedKeys = watchedUiState.watchedKeys,
-                        modifier = Modifier.weight(1f),
-                        onCatalogClick = onCatalogClick,
-                        onPosterClick = onPosterClick,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MobileFolderDetailContent(
-    uiState: FolderDetailUiState,
-    watchedKeys: Set<String>,
-    coverImageUrl: String?,
-    useNativeNavigation: Boolean,
-    onBack: () -> Unit,
-    onCatalogClick: (HomeCatalogSection) -> Unit,
-    onPosterClick: (MetaPreview) -> Unit,
-) {
-    val folder = uiState.folder
     val density = LocalDensity.current
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val maxHeroHeightPx = with(density) { FolderCoverHeight.toPx() }
     var heroHeightPx by remember(coverImageUrl, maxHeroHeightPx) {
         mutableFloatStateOf(if (coverImageUrl != null) maxHeroHeightPx else 0f)
     }
+
     val heroScrollConnection = remember(coverImageUrl, maxHeroHeightPx) {
         object : NestedScrollConnection {
             fun consumeHeroDelta(deltaY: Float): Float {
@@ -247,6 +134,7 @@ private fun MobileFolderDetailContent(
             }
         }
     }
+
     val heroHeight = with(density) { heroHeightPx.toDp() }
     val heroCollapseFraction = if (coverImageUrl == null || maxHeroHeightPx == 0f) {
         1f
@@ -259,15 +147,59 @@ private fun MobileFolderDetailContent(
         Modifier
     }
 
+    var hasRequestedInitialFocus by remember { mutableStateOf(false) }
+
+    val screenFocusRequester = remember { FocusRequester() }
+    val homeFocusCoordinator = remember { com.nuvio.app.features.home.components.HomeFocusCoordinator() }
+
+    LaunchedEffect(Unit) {
+        runCatching { screenFocusRequester.requestFocus() }
+    }
+
+    val qAndEModifier = Modifier
+        .focusRequester(screenFocusRequester)
+        .focusable()
+        .onKeyEvent { event ->
+            if (event.type == KeyEventType.KeyDown && !hasRequestedInitialFocus) {
+                if (event.key == Key.DirectionUp || event.key == Key.DirectionDown || event.key == Key.DirectionLeft || event.key == Key.DirectionRight) {
+                    val activated = runCatching { homeFocusCoordinator.firstPosterFocusRequester.requestFocus() }.isSuccess
+                    if (activated) {
+                        hasRequestedInitialFocus = true
+                        return@onKeyEvent true
+                    }
+                }
+            }
+            if (event.type == KeyEventType.KeyUp && uiState.tabs.size > 1) {
+                if (event.key == Key.Q) {
+                    val newIndex = (uiState.selectedTabIndex - 1).coerceAtLeast(0)
+                    if (newIndex != uiState.selectedTabIndex) {
+                        FolderDetailRepository.selectTab(newIndex)
+                        hasRequestedInitialFocus = false
+                        runCatching { screenFocusRequester.requestFocus() }
+                        true
+                    } else false
+                } else if (event.key == Key.E) {
+                    val newIndex = (uiState.selectedTabIndex + 1).coerceAtMost(uiState.tabs.size - 1)
+                    if (newIndex != uiState.selectedTabIndex) {
+                        FolderDetailRepository.selectTab(newIndex)
+                        hasRequestedInitialFocus = false
+                        runCatching { screenFocusRequester.requestFocus() }
+                        true
+                    } else false
+                } else false
+            } else false
+        }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .then(qAndEModifier)
             .background(MaterialTheme.colorScheme.background),
     ) {
         if (coverImageUrl != null && heroHeight > 0.dp) {
             FolderCoverImage(
                 imageUrl = coverImageUrl,
-                title = folder?.title.orEmpty(),
+                title = folder.title,
                 modifier = Modifier.height(heroHeight),
             )
         }
@@ -299,16 +231,23 @@ private fun MobileFolderDetailContent(
         when (uiState.viewMode) {
             FolderViewMode.TABBED_GRID -> TabbedGridContent(
                 uiState = uiState,
-                watchedKeys = watchedKeys,
+                watchedKeys = watchedUiState.watchedKeys,
                 modifier = Modifier.weight(1f).then(contentModifier),
                 onTabSelected = { FolderDetailRepository.selectTab(it) },
                 onPosterClick = onPosterClick,
+                firstItemFocusRequester = homeFocusCoordinator.firstPosterFocusRequester,
             )
-            FolderViewMode.ROWS,
-            FolderViewMode.FOLLOW_LAYOUT,
-            -> RowsContent(
+            FolderViewMode.ROWS -> RowsContent(
                 uiState = uiState,
-                watchedKeys = watchedKeys,
+                watchedKeys = watchedUiState.watchedKeys,
+                modifier = Modifier.weight(1f).then(contentModifier),
+                onCatalogClick = onCatalogClick,
+                onPosterClick = onPosterClick,
+                homeFocusCoordinator = homeFocusCoordinator,
+            )
+            FolderViewMode.FOLLOW_LAYOUT -> RowsContent(
+                uiState = uiState,
+                watchedKeys = watchedUiState.watchedKeys,
                 modifier = Modifier.weight(1f).then(contentModifier),
                 onCatalogClick = onCatalogClick,
                 onPosterClick = onPosterClick,
@@ -338,10 +277,10 @@ private fun FolderCoverImage(
 private fun TabbedGridContent(
     uiState: FolderDetailUiState,
     watchedKeys: Set<String>,
-    pageHorizontalPadding: Dp = 16.dp,
     modifier: Modifier = Modifier,
     onTabSelected: (Int) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
+    firstItemFocusRequester: FocusRequester,
 ) {
     val gridState = rememberLazyGridState()
 
@@ -364,8 +303,8 @@ private fun TabbedGridContent(
                 ScrollableTabRow(
                     selectedTabIndex = uiState.selectedTabIndex,
                     modifier = Modifier.fillMaxWidth(),
-                    edgePadding = pageHorizontalPadding,
-                    containerColor = if (isDesktop) Color.Transparent else MaterialTheme.colorScheme.background,
+                    edgePadding = 16.dp,
+                    containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                     divider = {},
                 ) {
@@ -390,32 +329,11 @@ private fun TabbedGridContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
         val selectedTab = uiState.tabs.getOrNull(uiState.selectedTabIndex)
         if (selectedTab == null) return
 
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val posterCardStyle = rememberPosterCardStyleUiState()
-            val columns = remember(maxWidth, maxHeight, posterCardStyle.widthDp, isDesktop) {
-                if (isDesktop) {
-                    posterGridColumnCountForViewport(maxWidth, maxHeight, posterCardStyle.widthDp)
-                } else {
-                    folderDetailGridColumnsForWidth(maxWidth)
-                }
-            }
-            val basePosterWidthDp = catalogPosterBaseWidthDp(posterCardStyle.widthDp)
-            val gridCells = if (isDesktop) {
-                GridCells.FixedSize(
-                    if (posterCardStyle.catalogLandscapeModeEnabled) {
-                        landscapePosterWidth(basePosterWidthDp)
-                    } else {
-                        basePosterWidthDp.dp
-                    },
-                )
-            } else {
-                GridCells.Fixed(columns)
-            }
+            val columns = remember(maxWidth) { folderDetailGridColumnsForWidth(maxWidth) }
 
             when {
                 selectedTab.isLoading && selectedTab.items.isEmpty() -> LoadingIndicator()
@@ -424,50 +342,44 @@ private fun TabbedGridContent(
                 else -> {
                     Box(modifier = Modifier.fillMaxSize()) {
                         LazyVerticalGrid(
-                            columns = gridCells,
+                            columns = GridCells.Fixed(columns),
                             state = gridState,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize()
+                                .dpadNavigationContainer(handleUpDown = true, handleLeftRight = true),
                             contentPadding = PaddingValues(
-                                start = pageHorizontalPadding,
-                                end = pageHorizontalPadding,
+                                top = 12.dp,
+                                start = 16.dp,
+                                end = 16.dp,
                                 bottom = nuvioSafeBottomPadding(18.dp),
                             ),
-                            horizontalArrangement = Arrangement.spacedBy(if (isDesktop) 12.dp else 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(if (isDesktop) 18.dp else 14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            items(
+                            itemsIndexed(
                                 items = selectedTab.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
-                                key = { item -> item.lazyKey },
-                            ) { keyedItem ->
+                                key = { _, item -> item.lazyKey },
+                            ) { index, keyedItem ->
                                 val item = keyedItem.value
                                 val isWatched = WatchingState.isPosterWatched(
                                     watchedKeys = watchedKeys,
                                     item = item,
                                 )
-                                if (isDesktop) {
-                                    HomePosterCard(
-                                        item = item,
-                                        useLandscapeBackdropMode = posterCardStyle.catalogLandscapeModeEnabled,
+                                HomePosterHoverPreview(
+                                    item = item,
+                                    isWatched = isWatched,
+                                    onClick = { onPosterClick(item) },
+                                    onLongClick = null,
+                                ) {
+                                    NuvioPosterCard(
+                                        title = item.name,
+                                        imageUrl = item.poster,
+                                        modifier = it,
+                                        shape = NuvioPosterShape.Poster,
+                                        detailLine = item.releaseInfo,
                                         isWatched = isWatched,
                                         onClick = { onPosterClick(item) },
+                                        focusRequester = if (index == 0) firstItemFocusRequester else null,
                                     )
-                                } else {
-                                    HomePosterHoverPreview(
-                                        item = item,
-                                        isWatched = isWatched,
-                                        onClick = { onPosterClick(item) },
-                                        onLongClick = null,
-                                    ) {
-                                        NuvioPosterCard(
-                                            title = item.name,
-                                            imageUrl = item.poster,
-                                            modifier = it,
-                                            shape = NuvioPosterShape.Poster,
-                                            detailLine = item.releaseInfo,
-                                            isWatched = isWatched,
-                                            onClick = { onPosterClick(item) },
-                                        )
-                                    }
                                 }
                             }
 
@@ -498,6 +410,7 @@ private fun RowsContent(
     modifier: Modifier = Modifier,
     onCatalogClick: (HomeCatalogSection) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
+    homeFocusCoordinator: com.nuvio.app.features.home.components.HomeFocusCoordinator,
 ) {
     val sections = FolderDetailRepository.getCatalogSectionsForRows()
     val listState = rememberLazyListState()
@@ -512,70 +425,47 @@ private fun RowsContent(
         return
     }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val sectionPadding = if (isDesktop) homeSectionHorizontalPaddingForWidth(maxWidth.value) else null
-        val posterCardStyle = rememberPosterCardStyleUiState()
-        val catalogPreviewLimit = if (isDesktop) {
-            homeCatalogPreviewLimitForWidth(
-                maxWidthDp = maxWidth.value,
-                sectionPadding = sectionPadding ?: 0.dp,
-                basePosterWidthDp = posterCardStyle.widthDp,
-                useLandscapeMode = posterCardStyle.catalogLandscapeModeEnabled,
-            )
-        } else {
-            18
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                bottom = nuvioSafeBottomPadding(18.dp),
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(
-                items = sections.withDuplicateSafeLazyKeys { it.key },
-                key = { it.lazyKey },
-            ) { keyedSection ->
-                val section = keyedSection.value
-                HomeCatalogRowSection(
-                    section = section,
-                    entries = if (isDesktop) {
-                        // Match desktop home rows: the lazy row exposes every fetched item so the
-                        // catalog remains horizontally scrollable without opening the expanded view.
-                        section.items
-                    } else {
-                        section.items.take(catalogPreviewLimit)
-                    },
-                    sectionPadding = sectionPadding,
-                    onViewAllClick = if (section.canOpenCatalog(catalogPreviewLimit)) {
-                        { onCatalogClick(section) }
-                    } else {
-                        null
-                    },
-                    watchedKeys = watchedKeys,
-                    onPosterClick = { onPosterClick(it) },
-                )
+    CompositionLocalProvider(com.nuvio.app.features.home.components.LocalHomeFocusCoordinator provides homeFocusCoordinator) {
+        Box(modifier = modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
+                    .dpadNavigationContainer(handleUpDown = true, handleLeftRight = false),
+                contentPadding = PaddingValues(
+                    top = 12.dp,
+                    bottom = nuvioSafeBottomPadding(18.dp),
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                itemsIndexed(
+                    items = sections.withDuplicateSafeLazyKeys { it.key },
+                    key = { _, it -> it.lazyKey },
+                ) { index, keyedSection ->
+                    val section = keyedSection.value
+                    HomeCatalogRowSection(
+                        section = section,
+                        entries = section.items.take(18),
+                        onViewAllClick = if (section.canOpenCatalog(18)) {
+                            { onCatalogClick(section) }
+                        } else {
+                            null
+                        },
+                        watchedKeys = watchedKeys,
+                        onPosterClick = { onPosterClick(it) },
+                        isFirstFocusableRow = index == 0,
+                    )
+                }
             }
+            NuvioDesktopVerticalScrollbar(
+                state = listState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+            )
         }
-        NuvioDesktopVerticalScrollbar(
-            state = listState,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(vertical = 8.dp, horizontal = 4.dp),
-        )
     }
 }
-
-private fun folderDetailGridColumnsForWidth(screenWidth: Dp): Int =
-    when {
-        screenWidth >= 1400.dp -> 7
-        screenWidth >= 1200.dp -> 6
-        screenWidth >= 1000.dp -> 5
-        screenWidth >= 840.dp -> 4
-        else -> 3
-    }
 
 @Composable
 private fun PaginationLoadingFooter() {
@@ -591,6 +481,15 @@ private fun PaginationLoadingFooter() {
         )
     }
 }
+
+private fun folderDetailGridColumnsForWidth(screenWidth: Dp): Int =
+    when {
+        screenWidth >= 1400.dp -> 7
+        screenWidth >= 1200.dp -> 6
+        screenWidth >= 1000.dp -> 5
+        screenWidth >= 840.dp -> 4
+        else -> 3
+    }
 
 @Composable
 private fun LoadingIndicator() {

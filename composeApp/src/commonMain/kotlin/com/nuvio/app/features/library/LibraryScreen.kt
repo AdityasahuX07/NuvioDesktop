@@ -270,6 +270,7 @@ fun LibraryScreen(
                 posterGridColumnCountForWidth(maxWidth)
             }
         }
+        val libraryStickyHeaderExtraGapPx = with(LocalDensity.current) { com.nuvio.app.core.ui.focus.StickyHeaderExtraGap.roundToPx() }
 
         CompositionLocalProvider(
             LocalStickyHeaderInsetPx provides (libraryStickyHeaderHeightPx + libraryStickyHeaderExtraGapPx),

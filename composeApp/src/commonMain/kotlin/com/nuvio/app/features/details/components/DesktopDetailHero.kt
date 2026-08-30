@@ -89,13 +89,6 @@ fun DesktopDetailBackdrop(
     onHeroTrailerReady: () -> Unit,
     onHeroTrailerEnded: () -> Unit,
     onHeroTrailerError: () -> Unit,
-
-    onPlayClick: () -> Unit,
-    onPlayLongClick: (() -> Unit)?,
-    onWatchedClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    onSaveLongClick: (() -> Unit)?,
-    playFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -206,6 +199,7 @@ fun DesktopDetailHero(
     onWatchedClick: () -> Unit,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    playFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val space = NuvioTokens.Space

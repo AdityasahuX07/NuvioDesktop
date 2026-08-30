@@ -5,8 +5,8 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -100,7 +100,7 @@ import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.PosterZoomAnchor
 import com.nuvio.app.core.ui.PosterZoomAnchorHolder
 import com.nuvio.app.core.ui.PosterZoomOverlayAction
-import com.nuvio.app.core.ui.fullscreenActionHorizontalInsetForWidth
+import com.nuvio.app.core.ui.desktopPageHorizontalPaddingForWidth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.TrackingListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
@@ -119,6 +119,7 @@ import com.nuvio.app.features.details.components.DetailMetaInfo
 import com.nuvio.app.features.details.components.DetailPosterRailSection
 import com.nuvio.app.features.details.components.DetailProductionSection
 import com.nuvio.app.features.details.components.DetailSeriesContent
+import com.nuvio.app.features.details.components.DesktopDetailBackdrop
 import com.nuvio.app.features.details.components.DesktopDetailHero
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
@@ -135,6 +136,7 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbService
+import com.nuvio.app.features.tmdb.originalTmdbImageUrl
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
@@ -169,6 +171,23 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 private val watchedMarkerDiagnosticLog = Logger.withTag("WatchedMarkerDiag")
+private const val DetailScrolledBackgroundDefaultMaxAlpha = 0.86f
+private const val DetailScrolledBackgroundCinematicMaxAlpha = 0.36f
+private const val DetailScrolledBackgroundFadeHeroFraction = 0.75f
+
+internal fun detailScrolledBackgroundProgress(scrollOffsetPx: Float, heroHeightPx: Int): Float {
+    if (scrollOffsetPx <= 0f || heroHeightPx <= 0) return 0f
+    val fadeDistancePx = heroHeightPx * DetailScrolledBackgroundFadeHeroFraction
+    return (scrollOffsetPx / fadeDistancePx).coerceIn(0f, 1f)
+}
+
+internal fun detailScrolledBackgroundAlpha(
+    scrollOffsetPx: Float,
+    heroHeightPx: Int,
+    maxAlpha: Float = DetailScrolledBackgroundDefaultMaxAlpha,
+): Float {
+    return detailScrolledBackgroundProgress(scrollOffsetPx, heroHeightPx) * maxAlpha.coerceIn(0f, 1f)
+}
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -956,8 +975,13 @@ fun MetaDetailsScreen(
                 val headerProgressProvider = remember(headerProgressState) {
                     { headerProgressState.value }
                 }
-                val showHeroBackButton by remember(headerProgressState) {
+                val animatedShowHeroBackButton by remember(headerProgressState) {
                     derivedStateOf { headerProgressState.value <= 0.05f }
+                }
+                val showHeroBackButton = if (isDesktop) {
+                    !isHeroCollapsed.value
+                } else {
+                    animatedShowHeroBackButton
                 }
                 val headerInteractive by remember(headerProgressState) {
                     derivedStateOf { headerProgressState.value > 0.05f }
@@ -969,7 +993,14 @@ fun MetaDetailsScreen(
                     val isTablet = screenMaxWidth >= 720.dp
                     val useDesktopDetailLayout = isDesktop && screenMaxWidth >= 1000.dp
                     val viewportHeight = maxHeight
-                    val contentHorizontalPadding = if (isTablet) 32.dp else 18.dp
+                    val desktopPageHorizontalPadding = desktopPageHorizontalPaddingForWidth(screenMaxWidth.value)
+                    val contentHorizontalPadding = if (isDesktop) {
+                        desktopPageHorizontalPadding
+                    } else if (isTablet) {
+                        32.dp
+                    } else {
+                        18.dp
+                    }
                     val contentMaxWidth = detailTabletContentMaxWidth(screenMaxWidth, isTablet)
                     val backdropUrl = meta.background ?: meta.poster
                     val backgroundMode = metaScreenSettingsUiState.backgroundMode
@@ -1051,7 +1082,7 @@ fun MetaDetailsScreen(
                             MetaScreenBackgroundMode.Normal -> Unit
                             MetaScreenBackgroundMode.Cinematic -> if (deferredMetaWorkAllowed && backdropUrl != null) {
                                 AsyncImage(
-                                    model = backdropUrl,
+                                    model = if (isDesktop) originalTmdbImageUrl(backdropUrl) else backdropUrl,
                                     contentDescription = null,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -1061,7 +1092,11 @@ fun MetaDetailsScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(colorScheme.background.copy(alpha = 0.92f)),
+                                        .background(
+                                            colorScheme.background.copy(
+                                                alpha = if (isDesktop) 0.48f else 0.92f,
+                                            ),
+                                        ),
                                 )
                             }
                             MetaScreenBackgroundMode.DominantColor -> if (deferredMetaWorkAllowed) {
@@ -1071,6 +1106,77 @@ fun MetaDetailsScreen(
                                         .background(dominantBackdropColor),
                                 )
                             }
+                        }
+                        if (useDesktopDetailLayout) {
+                            DesktopDetailBackdrop(
+                                meta = meta,
+                                viewportHeight = viewportHeight,
+                                heroTrailerSourceUrl = heroTrailerSourceUrl,
+                                heroTrailerSourceAudioUrl = heroTrailerSourceAudioUrl,
+                                heroTrailerReady = heroTrailerReady,
+                                heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
+                                heroTrailerMuted = heroTrailerMuted,
+                                heroGradientColor = dominantBackdropColor.takeIf { dominantColorEnabled },
+                                onBackdropLoaded = { painter -> dominantBackdropPainter = painter },
+                                onHeroTrailerReady = {
+                                    if (!heroTrailerFinished) heroTrailerReady = true
+                                },
+                                onHeroTrailerEnded = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                },
+                                onHeroTrailerError = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                },
+                            )
+
+                            if (backgroundMode == MetaScreenBackgroundMode.Cinematic) {
+                                DesktopDetailBackdrop(
+                                    meta = meta,
+                                    viewportHeight = viewportHeight,
+                                    heroTrailerSourceUrl = null,
+                                    heroTrailerSourceAudioUrl = null,
+                                    heroTrailerReady = false,
+                                    heroTrailerPlayWhenReady = false,
+                                    heroTrailerMuted = true,
+                                    blurBackdrop = true,
+                                    onHeroTrailerReady = {},
+                                    onHeroTrailerEnded = {},
+                                    onHeroTrailerError = {},
+                                    modifier = Modifier
+                                        .zIndex(0.25f)
+                                        .graphicsLayer {
+                                            alpha = detailScrolledBackgroundProgress(
+                                                scrollOffsetPx = detailScrollOffsetPx(),
+                                                heroHeightPx = heroHeightPx.intValue,
+                                            )
+                                        },
+                                )
+                            }
+
+                            val scrolledBackgroundColor = if (dominantColorEnabled) {
+                                dominantBackdropColor
+                            } else {
+                                colorScheme.background
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .zIndex(0.5f)
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        alpha = detailScrolledBackgroundAlpha(
+                                            scrollOffsetPx = detailScrollOffsetPx(),
+                                            heroHeightPx = heroHeightPx.intValue,
+                                            maxAlpha = if (backgroundMode == MetaScreenBackgroundMode.Cinematic) {
+                                                DetailScrolledBackgroundCinematicMaxAlpha
+                                            } else {
+                                                DetailScrolledBackgroundDefaultMaxAlpha
+                                            },
+                                        )
+                                    }
+                                    .background(scrolledBackgroundColor),
+                            )
                         }
                         LazyColumn(
                             state = listState,
@@ -1090,32 +1196,12 @@ fun MetaDetailsScreen(
                                         playButtonLabel = playButtonLabel,
                                         isSaved = isSaved,
                                         isWatched = isWatched,
-                                        scrollOffset = heroScrollOffset,
                                         onHeightChanged = { heroHeightPx.intValue = it },
                                         heroTrailerSourceUrl = heroTrailerSourceUrl,
-                                        heroTrailerSourceAudioUrl = heroTrailerSourceAudioUrl,
                                         heroTrailerReady = heroTrailerReady,
-                                        heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
                                         heroTrailerMuted = heroTrailerMuted,
-                                        heroGradientColor = dominantBackdropColor.takeIf { dominantColorEnabled },
-                                        onBackdropLoaded = { painter ->
-                                            dominantBackdropPainter = painter
-                                        },
                                         onHeroTrailerMuteToggle = {
                                             HeroTrailerAudioState.toggleMuted()
-                                        },
-                                        onHeroTrailerReady = {
-                                            if (!heroTrailerFinished) {
-                                                heroTrailerReady = true
-                                            }
-                                        },
-                                        onHeroTrailerEnded = {
-                                            heroTrailerReady = false
-                                            heroTrailerFinished = true
-                                        },
-                                        onHeroTrailerError = {
-                                            heroTrailerReady = false
-                                            heroTrailerFinished = true
                                         },
                                         onPlayClick = onPrimaryPlayClick,
                                         onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
@@ -1133,7 +1219,7 @@ fun MetaDetailsScreen(
                                     ),
                                     meta = meta,
                                     isTablet = true,
-                                    contentHorizontalPadding = 56.dp,
+                                    contentHorizontalPadding = desktopPageHorizontalPadding,
                                     contentMaxWidth = Dp.Unspecified,
                                     playButtonLabel = playButtonLabel,
                                     isSaved = isSaved,
@@ -1344,7 +1430,9 @@ fun MetaDetailsScreen(
                                 .zIndex(2f),
                         )
 
-                        if (backgroundMode.usesBackdropBackground && deferredMetaWorkAllowed && heroHeightPx.intValue > 0) {
+                        if (!useDesktopDetailLayout && backgroundMode.usesBackdropBackground &&
+                            deferredMetaWorkAllowed && heroHeightPx.intValue > 0
+                        ) {
                             val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
                                 ?: colorScheme.background
                             Box(
@@ -1368,7 +1456,7 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        if (!useDesktopDetailLayout && showHeroBackButton) {
+                        if (!isDesktop && !useDesktopDetailLayout && showHeroBackButton) {
                             NuvioBackButton(
                                 onClick = onBackFromDetails,
                                 modifier = Modifier.padding(
@@ -1381,14 +1469,14 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        if (useDesktopDetailLayout && showHeroBackButton) {
-                            val actionHorizontalInset = fullscreenActionHorizontalInsetForWidth(screenMaxWidth.value)
+                        if (isDesktop) {
                             NuvioBackButton(
                                 onClick = onBackFromDetails,
                                 modifier = Modifier
-                                    .padding(start = actionHorizontalInset, top = 32.dp)
+                                    .padding(start = desktopPageHorizontalPadding, top = 32.dp)
                                     .zIndex(2f),
                                 containerColor = Color.Black.copy(alpha = 0.34f),
+                                showContainerOnDesktop = true,
                                 contentColor = MaterialTheme.colorScheme.onBackground,
                                 buttonSize = 48.dp,
                                 iconSize = 24.dp,
@@ -1396,16 +1484,18 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        DetailFloatingHeader(
-                            meta = meta,
-                            isSaved = isSaved,
-                            progressProvider = headerProgressProvider,
-                            interactive = headerInteractive,
-                            backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
-                            onBack = onBackFromDetails,
-                            onToggleSaved = toggleSaved,
-                            modifier = Modifier.zIndex(2f),
-                        )
+                        if (!isDesktop) {
+                            DetailFloatingHeader(
+                                meta = meta,
+                                isSaved = isSaved,
+                                progressProvider = headerProgressProvider,
+                                interactive = headerInteractive,
+                                backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
+                                onBack = onBackFromDetails,
+                                onToggleSaved = toggleSaved,
+                                modifier = Modifier.zIndex(2f),
+                            )
+                        }
 
                         selectedEpisodeForActions
                             ?.takeIf { selectedEpisodeZoomAnchor == null }
@@ -1674,15 +1764,30 @@ fun MetaDetailsScreen(
         }
 
         if (displayedMeta == null) {
-            NuvioBackButton(
-                onClick = onBack,
-                modifier = Modifier.padding(
-                    start = 12.dp,
-                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
-                ),
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onBackground,
-            )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val loadingBackButtonStartPadding = if (isDesktop) {
+                    desktopPageHorizontalPaddingForWidth(maxWidth.value)
+                } else {
+                    12.dp
+                }
+                val loadingBackButtonTopPadding = if (isDesktop) {
+                    32.dp
+                } else {
+                    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp
+                }
+                NuvioBackButton(
+                    onClick = onBack,
+                    modifier = Modifier.padding(
+                        start = loadingBackButtonStartPadding,
+                        top = loadingBackButtonTopPadding,
+                    ),
+                    containerColor = if (isDesktop) Color.Black.copy(alpha = 0.34f) else Color.Transparent,
+                    showContainerOnDesktop = isDesktop,
+                    contentColor = MaterialTheme.colorScheme.onBackground,
+                    buttonSize = if (isDesktop) 48.dp else 40.dp,
+                    iconSize = 24.dp,
+                )
+            }
         }
         }
 

@@ -30,6 +30,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -361,6 +371,8 @@ private fun HeroDesktopContentLayers(
     onItemClick: ((MetaPreview) -> Unit)?,
     includePagerNeighbors: Boolean,
 ) {
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val homeFocusCoordinatorForNav = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
     val layerPages = rememberHeroLayerPages(
         pagerState = pagerState,
         itemCount = items.size,
@@ -382,6 +394,31 @@ private fun HeroDesktopContentLayers(
                 item = items[page],
                 layout = layout,
                 onItemClick = onItemClick,
+                isActivePage = page == pagerState.currentPage,
+                onNavigatePreviousPage = {
+                    if (items.size > 1) {
+                        val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(prevPage)
+                            delay(50L)
+                            homeFocusCoordinatorForNav?.let {
+                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                            }
+                        }
+                    }
+                },
+                onNavigateNextPage = {
+                    if (items.size > 1) {
+                        val nextPage = (pagerState.currentPage + 1) % items.size
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(nextPage)
+                            delay(50L)
+                            homeFocusCoordinatorForNav?.let {
+                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                            }
+                        }
+                    }
+                },
             )
         }
     }
@@ -851,6 +888,9 @@ private fun DesktopHeroContentBlock(
     item: MetaPreview,
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
+    isActivePage: Boolean = true,
+    onNavigatePreviousPage: () -> Unit = {},
+    onNavigateNextPage: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var logoLoadError by remember(item.type, item.id, item.logo) {
@@ -943,10 +983,49 @@ private fun DesktopHeroContentBlock(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val homeFocusCoordinator = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
+                val heroButtonInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                 Surface(
                     modifier = Modifier
                         .height(48.dp)
-                        .clickable { onItemClick(item) },
+                        .then(
+                            if (homeFocusCoordinator != null && isActivePage) {
+                                Modifier
+                                    .focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester)
+                                    .focusProperties { down = homeFocusCoordinator.downFromHeroTarget() }
+                                    .onFocusChanged { state ->
+                                        homeFocusCoordinator.isHeroButtonFocused.value = state.isFocused
+                                    }
+                                    .onKeyEvent { event ->
+                                        if (event.type != KeyEventType.KeyDown) {
+                                            false
+                                        } else {
+                                            when (event.key) {
+                                                Key.DirectionLeft -> {
+                                                    onNavigatePreviousPage()
+                                                    true
+                                                }
+                                                Key.DirectionRight -> {
+                                                    onNavigateNextPage()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        }
+                                    }
+                                    .dpadFocusRing(
+                                        interactionSource = heroButtonInteractionSource,
+                                        cornerRadius = 40.dp,
+                                        scaleFactor = 1.08f,
+                                    )
+                            } else {
+                                Modifier.focusProperties { canFocus = false }
+                            },
+                        )
+                        .clickable(
+                            interactionSource = heroButtonInteractionSource,
+                            indication = null,
+                        ) { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,
                     shape = RoundedCornerShape(40.dp),

@@ -3620,16 +3620,6 @@ if (activeModal) {
   if (isTextEntryTarget(event.target)) {
     return;
   }
-  if (event.code === "Space" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    event.preventDefault();
-    if (!event.repeat && !window.spaceHoldTimer) {
-      window.spaceHoldTimer = setTimeout(() => {
-        send("keyboardActivateHoldToSpeed", 0);
-        window.isSpaceHoldingToSpeed = true;
-      }, 500);
-    }
-    return;
-  }
 if (event.metaKey || event.ctrlKey || event.altKey || event.key === "Alt" || event.key === "Control" || event.key === "Meta") {
     if (spaceHoldTimer) {
       window.clearTimeout(spaceHoldTimer);
@@ -3709,23 +3699,6 @@ if (command === "keyboardFineSeekForward") {
   }
   showCommandToast(command);
   send(command, 0);
-});
-
-document.addEventListener("keyup", event => {
-  if (event.code === "Space" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    if (window.spaceHoldTimer) {
-      clearTimeout(window.spaceHoldTimer);
-      window.spaceHoldTimer = null;
-    }
-    if (window.isSpaceHoldingToSpeed) {
-      send("keyboardDeactivateHoldToSpeed", 0);
-      window.isSpaceHoldingToSpeed = false;
-    } else {
-      if (!isTextEntryTarget(event.target)) {
-        requestPlaybackState("setPlaybackStateQuiet", false);
-      }
-    }
-  }
 });
 
 setProgress(0, 0);

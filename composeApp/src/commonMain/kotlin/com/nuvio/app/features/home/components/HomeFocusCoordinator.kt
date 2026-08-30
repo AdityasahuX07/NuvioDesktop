@@ -19,6 +19,9 @@ class HomeFocusCoordinator {
     /** Focus target for the Hero's "View Details" button/pill. */
     val heroViewDetailsFocusRequester = FocusRequester()
 
+    /** Focus target for the Fullscreen action button. */
+    val fullscreenButtonFocusRequester = FocusRequester()
+
     /** Focus target for the first poster of the first poster row. */
     val firstPosterFocusRequester = FocusRequester()
 

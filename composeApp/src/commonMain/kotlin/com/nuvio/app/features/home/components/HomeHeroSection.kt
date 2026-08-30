@@ -664,7 +664,7 @@ private fun DesktopHomeHeroFrame(
                             if (homeFocusCoordinatorForFullscreen != null) {
                                 Modifier.focusProperties {
                                     down = homeFocusCoordinatorForFullscreen.heroViewDetailsFocusRequester
-                                }
+                                }.focusRequester(homeFocusCoordinatorForFullscreen.fullscreenButtonFocusRequester)
                             } else {
                                 Modifier
                             }
@@ -1029,6 +1029,7 @@ private fun DesktopHeroContentBlock(
                                         interactionSource = heroButtonInteractionSource,
                                         cornerRadius = 40.dp,
                                         scaleFactor = 1.08f,
+                                        isAlreadyFocused = homeFocusCoordinator?.isHeroButtonFocused?.value == true,
                                     )
                             } else {
                                 Modifier.focusProperties { canFocus = false }

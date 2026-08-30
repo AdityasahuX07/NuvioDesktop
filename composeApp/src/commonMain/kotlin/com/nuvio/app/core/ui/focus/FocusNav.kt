@@ -105,8 +105,10 @@ fun Modifier.dpadFocusRing(
     scaleFactor: Float = DpadFocusScale,
     gap: Dp = 0.dp,
     color: Color? = null,
+    isAlreadyFocused: Boolean = false,
 ): Modifier {
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isInteractionFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused = isInteractionFocused || isAlreadyFocused
     val borderWidth by animateDpAsState(
         targetValue = if (isFocused) 3.dp else 0.dp,
         animationSpec = spring(

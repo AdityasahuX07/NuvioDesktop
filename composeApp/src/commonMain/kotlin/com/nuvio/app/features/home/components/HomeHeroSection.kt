@@ -652,12 +652,22 @@ private fun DesktopHomeHeroFrame(
             }
 
             if (isFullscreenActionSupported) {
+                val homeFocusCoordinatorForFullscreen = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
                 FullscreenActionButton(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(
                             top = space.s32,
                             end = contentHorizontalPadding,
+                        )
+                        .then(
+                            if (homeFocusCoordinatorForFullscreen != null) {
+                                Modifier.focusProperties {
+                                    down = homeFocusCoordinatorForFullscreen.heroViewDetailsFocusRequester
+                                }
+                            } else {
+                                Modifier
+                            }
                         ),
                     buttonSize = 48.dp,
                     iconSize = 24.dp,

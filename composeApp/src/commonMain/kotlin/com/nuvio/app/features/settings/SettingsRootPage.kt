@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import com.nuvio.app.core.build.AppVersionPolicy
+import com.nuvio.app.isDesktop
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_about_based_on_version_format
 import nuvio.composeapp.generated.resources.compose_about_made_with
@@ -37,6 +39,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_appearance
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
 import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
+import nuvio.composeapp.generated.resources.compose_settings_page_shortcuts
 import nuvio.composeapp.generated.resources.compose_settings_page_playback
 import nuvio.composeapp.generated.resources.compose_settings_page_privacy_policy
 import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
@@ -50,6 +53,8 @@ import nuvio.composeapp.generated.resources.compose_settings_root_downloads_titl
 import nuvio.composeapp.generated.resources.compose_settings_root_general_section
 import nuvio.composeapp.generated.resources.compose_settings_root_integrations_description
 import nuvio.composeapp.generated.resources.compose_settings_root_notifications_description
+import nuvio.composeapp.generated.resources.compose_settings_root_shortcuts_description
+import nuvio.composeapp.generated.resources.compose_settings_root_shortcuts_section
 import nuvio.composeapp.generated.resources.compose_settings_root_privacy_policy_description
 import nuvio.composeapp.generated.resources.compose_settings_root_switch_profile_description
 import nuvio.composeapp.generated.resources.compose_settings_root_switch_profile_title
@@ -75,6 +80,7 @@ internal fun LazyListScope.settingsRootContent(
     onAppearanceClick: () -> Unit,
     onAdvancedClick: () -> Unit,
     onNotificationsClick: () -> Unit,
+    onShortcutsClick: () -> Unit,
     onContentDiscoveryClick: () -> Unit,
     onIntegrationsClick: () -> Unit,
     onTrackingClick: () -> Unit,
@@ -91,6 +97,7 @@ internal fun LazyListScope.settingsRootContent(
     showGeneralSection: Boolean = true,
     showAboutSection: Boolean = true,
     showAdvancedSection: Boolean = true,
+    showShortcutsSection: Boolean = true,
     showSupportersContributorsPage: Boolean = true,
 ) {
     if (showAccountSection) {
@@ -265,6 +272,9 @@ internal fun LazyListScope.settingsRootContent(
                 }
             }
         }
+    }
+    if (isDesktop && showShortcutsSection) {
+        shortcutsSettingsContent(isTablet = isTablet)
     }
     item {
         androidx.compose.foundation.layout.Column(

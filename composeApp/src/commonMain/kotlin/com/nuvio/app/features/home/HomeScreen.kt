@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,6 +27,8 @@ import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.RegisterDpadNavActivation
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.rememberHeroStretchState
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -44,6 +47,9 @@ import com.nuvio.app.features.details.seriesPrimaryAction
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import com.nuvio.app.features.home.components.HomeFocusCoordinator
+import com.nuvio.app.features.home.components.LocalHomeFocusCoordinator
+import com.nuvio.app.features.home.components.rememberHomeFocusCoordinator
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
 import com.nuvio.app.features.home.components.HomeHeroSection
 import com.nuvio.app.features.home.components.HomeSkeletonHero
@@ -107,6 +113,7 @@ import org.jetbrains.compose.resources.stringResource
 fun HomeScreen(
     modifier: Modifier = Modifier,
     animateCollectionGifs: Boolean = true,
+    homeSelected: Boolean = true,
     scrollToTopRequests: Flow<Unit> = emptyFlow(),
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
@@ -822,6 +829,31 @@ fun HomeScreen(
     }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val homeFocusCoordinator = rememberHomeFocusCoordinator()
+        LaunchedEffect(homeSelected) {
+            // Home stays composed even while another tab is showing, and switching tabs
+            // (especially by clicking a tab button, which moves real Compose focus onto that
+            // button) can leave real focus off of any Home poster while this flag is still
+            // `true` from a previous visit - silently breaking arrow keys next time the user
+            // comes back. Re-arming activation every time Home becomes the selected tab again
+            // matches the rest of the app: a fresh arrow press always wakes navigation up.
+            if (homeSelected) {
+                homeFocusCoordinator.hasRequestedInitialFocus = false
+            }
+        }
+        RegisterDpadNavActivation("Home") {
+            if (homeFocusCoordinator.hasRequestedInitialFocus) {
+                false
+            } else {
+                // Any first arrow press (not just Up) wakes up navigation on the top-most poster
+                // row - matching Search/Library/Settings, where every direction behaves the same
+                // way. Hero is reached only by actually navigating there afterward (Up from the
+                // top row, or Down from the fullscreen button), not as a special initial target.
+                val activated = runCatching { homeFocusCoordinator.firstPosterFocusRequester.requestFocus() }.isSuccess
+                if (activated) homeFocusCoordinator.hasRequestedInitialFocus = true
+                activated
+            }
+        }
         val homeSectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value)
         val continueWatchingLayout = rememberContinueWatchingLayout(maxWidth.value)
         val posterCardStyle = rememberPosterCardStyleUiState()
@@ -862,8 +894,10 @@ fun HomeScreen(
             Modifier
         }
 
+        CompositionLocalProvider(LocalHomeFocusCoordinator provides homeFocusCoordinator) {
         NuvioScreen(
-            modifier = Modifier.fillMaxSize().then(heroStretchModifier),
+            modifier = Modifier.fillMaxSize().then(heroStretchModifier)
+                .dpadNavigationContainer(handleLeftRight = false),
             horizontalPadding = 0.dp,
             topPadding = if (showHeroSlot) 0.dp else null,
             listState = homeListState,
@@ -912,6 +946,8 @@ fun HomeScreen(
                         onItemClick = onContinueWatchingClick,
                         onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
+                        isFirstFocusableRow = true,
+                        homeFocusCoordinator = homeFocusCoordinator,
                     )
                     item {
                         HomeEmptyStateCard(
@@ -935,6 +971,8 @@ fun HomeScreen(
                         onItemClick = onContinueWatchingClick,
                         onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
+                        isFirstFocusableRow = true,
+                        homeFocusCoordinator = homeFocusCoordinator,
                     )
                     items(3) {
                         HomeSkeletonRow(
@@ -968,7 +1006,7 @@ fun HomeScreen(
                 }
 
                 else -> {
-                    homeContinueWatchingSections(
+                    val cwClaimedFirstRow = homeContinueWatchingSections(
                         preferences = continueWatchingPreferences,
                         continueWatchingItems = continueWatchingItems,
                         upcomingItems = upcomingItems,
@@ -980,13 +1018,18 @@ fun HomeScreen(
                         onItemClick = onContinueWatchingClick,
                         onItemLongPress = onContinueWatchingLongPress,
                         disintegrationRequest = continueWatchingDisintegrationRequest,
+                        isFirstFocusableRow = true,
+                        homeFocusCoordinator = homeFocusCoordinator,
                     )
 
+                    var firstFocusableRowAssigned = cwClaimedFirstRow
                     keyedEnabledHomeItems.forEach { keyedSettingsItem ->
                         val settingsItem = keyedSettingsItem.value
                         if (settingsItem.isCollection) {
                             val collection = collectionsMap[settingsItem.key]
                             if (collection != null) {
+                                val isFirstFocusableRow = !firstFocusableRowAssigned
+                                firstFocusableRowAssigned = true
                                 item(key = keyedSettingsItem.lazyKey) {
                                     HomeCollectionRowSection(
                                         collection = collection,
@@ -994,12 +1037,15 @@ fun HomeScreen(
                                         sectionPadding = homeSectionPadding,
                                         animateGifs = animateCollectionGifs,
                                         onFolderClick = onFolderClick,
+                                        isFirstFocusableRow = isFirstFocusableRow,
                                     )
                                 }
                             }
                         } else {
                             val section = sectionsMap[settingsItem.key]
                             if (section != null && section.items.isNotEmpty()) {
+                                val isFirstFocusableRow = !firstFocusableRowAssigned
+                                firstFocusableRowAssigned = true
                                 item(key = keyedSettingsItem.lazyKey) {
                                     HomeCatalogRowSection(
                                         section = section,
@@ -1015,6 +1061,7 @@ fun HomeScreen(
                                         fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                         onPosterClick = onPosterClick,
                                         onPosterLongClick = onPosterLongClick,
+                                        isFirstFocusableRow = isFirstFocusableRow,
                                     )
                                 }
                             }
@@ -1022,6 +1069,7 @@ fun HomeScreen(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -1038,10 +1086,18 @@ private fun LazyListScope.homeContinueWatchingSections(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
     disintegrationRequest: DisintegrationRequest<String>?,
-) {
-    if (!preferences.isVisible) return
+    isFirstFocusableRow: Boolean = false,
+    homeFocusCoordinator: HomeFocusCoordinator? = null,
+): Boolean {
+    if (!preferences.isVisible) return false
+
+    // Continue Watching (if present) is always the first rail rendered on Home, ahead of the
+    // regular catalog rows - so it (not the first catalog row) is the "first poster row" that
+    // initial keyboard/D-pad activation and Up-from-first-row-to-Hero should target.
+    var claimedFirstRow = false
 
     if (continueWatchingItems.isNotEmpty()) {
+        val claimThisSection = isFirstFocusableRow && !claimedFirstRow
         item(key = HOME_CONTINUE_WATCHING_SECTION_KEY) {
             HomeContinueWatchingSection(
                 items = continueWatchingItems,
@@ -1056,11 +1112,14 @@ private fun LazyListScope.homeContinueWatchingSections(
                 onItemClick = onItemClick,
                 onItemLongPress = onItemLongPress,
                 disintegrationRequest = disintegrationRequest,
+                firstItemFocusRequester = if (claimThisSection) homeFocusCoordinator?.firstPosterFocusRequester else null,
             )
         }
+        claimedFirstRow = claimedFirstRow || claimThisSection
     }
 
     if (upcomingItems.isNotEmpty()) {
+        val claimThisSection = isFirstFocusableRow && !claimedFirstRow
         item(key = HOME_UPCOMING_SECTION_KEY) {
             HomeContinueWatchingSection(
                 items = upcomingItems,
@@ -1076,9 +1135,13 @@ private fun LazyListScope.homeContinueWatchingSections(
                 onItemClick = onItemClick,
                 onItemLongPress = onItemLongPress,
                 disintegrationRequest = disintegrationRequest,
+                firstItemFocusRequester = if (claimThisSection) homeFocusCoordinator?.firstPosterFocusRequester else null,
             )
         }
+        claimedFirstRow = claimedFirstRow || claimThisSection
     }
+
+    return claimedFirstRow
 }
 
 private const val HOME_CATALOG_PREVIEW_LIMIT = 18

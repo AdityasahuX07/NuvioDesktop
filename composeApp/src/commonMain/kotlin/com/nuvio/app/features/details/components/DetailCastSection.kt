@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +38,7 @@ import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.focus.dpadFocusRing
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
@@ -72,7 +74,14 @@ fun DetailCastSection(
                 modifier = Modifier
                     .nuvioHorizontalScrollBleed(horizontalScrollPadding)
                     .fillMaxWidth()
-                    .nuvioDesktopDragScroll(rowState),
+                    .nuvioDesktopDragScroll(rowState)
+                    // The row container itself must never be an eligible D-pad focus stop - only
+                    // the avatar circles inside it are. Without this, Down from the last-focused
+                    // avatar can land on the row's own (invisible, unringed) focus node as an
+                    // intermediate hop, which is what made leaving this section downward take two
+                    // presses instead of one (see the same canFocus = false pattern/rationale in
+                    // HomeHeroSection.kt).
+                    .focusProperties { canFocus = false },
                 contentPadding = PaddingValues(horizontal = horizontalScrollPadding),
                 horizontalArrangement = Arrangement.spacedBy(sizing.avatarGap),
             ) {
@@ -146,19 +155,7 @@ private fun CastItem(
     val clickInteractionSource = remember { MutableInteractionSource() }
 
     Column(
-        modifier = modifier
-            .width(sizing.itemWidth)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(
-                        interactionSource = clickInteractionSource,
-                        indication = null,
-                        onClick = onClick,
-                    )
-                } else {
-                    Modifier
-                },
-            ),
+        modifier = modifier.width(sizing.itemWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -166,6 +163,10 @@ private fun CastItem(
             modifier = Modifier
                 .then(avatarSharedElementModifier)
                 .size(sizing.avatarSize)
+                .dpadFocusRing(
+                    interactionSource = clickInteractionSource,
+                    cornerRadius = sizing.avatarSize / 2,
+                )
                 .clip(CircleShape)
                 .background(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -174,6 +175,20 @@ private fun CastItem(
                 .nuvioCardDepth(
                     shape = CircleShape,
                     surface = NuvioCardDepthSurface.Cast,
+                )
+                // The focus/click target is the avatar circle only (not the name/role text below
+                // it) - keeping this node's bounds small and tight to the ring it draws avoids the
+                // oversized-focus-rect ambiguity that made D-pad Down out of this row unreliable.
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(
+                            interactionSource = clickInteractionSource,
+                            indication = null,
+                            onClick = onClick,
+                        )
+                    } else {
+                        Modifier
+                    },
                 ),
             contentAlignment = Alignment.Center,
         ) {

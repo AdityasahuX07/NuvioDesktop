@@ -42,7 +42,16 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.features.debrid.DebridProviders
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.runtime.LaunchedEffect
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun StreamCard(
     stream: StreamItem,
@@ -60,6 +69,21 @@ internal fun StreamCard(
     val cardShape = RoundedCornerShape(12.dp)
     val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
     val hasBadges = badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)
+    var isNativelyFocused by remember { mutableStateOf(false) }
+
+    val explicitlyFocusedStreamIndex = LocalExplicitFocusedStreamIndex.current
+    val flatStreams = LocalFlatStreams.current
+    val isExplicitlyFocused = explicitlyFocusedStreamIndex in flatStreams.indices && flatStreams[explicitlyFocusedStreamIndex] === stream
+
+    val isFocused = isNativelyFocused || isExplicitlyFocused
+
+    val itemFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(isExplicitlyFocused) {
+        if (isExplicitlyFocused) {
+            try { itemFocusRequester.requestFocus() } catch (e: Exception) { }
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -72,14 +96,20 @@ internal fun StreamCard(
             )
             .clip(cardShape)
             .background(
-                if (isCurrent) {
+                if (isCurrent || isFocused) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 } else {
                     Color.White.copy(alpha = 0.05f)
                 },
             )
             .then(
-                if (isCurrent) {
+                if (isFocused) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = cardShape,
+                    )
+                } else if (isCurrent) {
                     Modifier.border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.52f),
@@ -89,6 +119,9 @@ internal fun StreamCard(
                     Modifier
                 },
             )
+            .focusRequester(itemFocusRequester)
+            .focusable()
+            .onFocusChanged { isNativelyFocused = it.isFocused }
             .combinedClickable(
                 enabled = enabled,
                 onClick = onClick,

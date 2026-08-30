@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.core.ui.NuvioDropdownChip
@@ -18,6 +20,7 @@ import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.PosterGridRow
 import com.nuvio.app.features.home.components.PosterGridSkeletonRow
+import com.nuvio.app.features.home.stableKey
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.library_filter_all_types
 import nuvio.composeapp.generated.resources.library_filter_list
@@ -108,14 +111,16 @@ internal fun LazyListScope.libraryVerticalContent(
     fullyWatchedSeriesKeys: Set<String>,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
+    firstPosterFocusRequester: FocusRequester? = null,
 ) {
-    items(
-        items = projection.entries.chunked(columns),
-        key = { rowEntries ->
+    val rows = projection.entries.chunked(columns)
+    itemsIndexed(
+        items = rows,
+        key = { _, rowEntries ->
             val firstEntry = rowEntries.first()
             "library-vertical:${firstEntry.item.type}:${firstEntry.item.id}"
         },
-    ) { rowEntries ->
+    ) { rowIndex, rowEntries ->
         PosterGridRow(
             items = rowEntries.map { entry -> entry.item.toMetaPreview() },
             columns = columns,
@@ -130,6 +135,11 @@ internal fun LazyListScope.libraryVerticalContent(
                 { preview ->
                     rowEntries.findEntry(preview)?.let { entry -> callback(entry.item, entry.section) }
                 }
+            },
+            focusRequesterFor = if (rowIndex == 0 && firstPosterFocusRequester != null) {
+                { preview -> firstPosterFocusRequester.takeIf { rowEntries.firstOrNull()?.item?.toMetaPreview()?.stableKey() == preview.stableKey() } }
+            } else {
+                null
             },
         )
     }

@@ -3,6 +3,7 @@ package com.nuvio.app.features.player.desktop
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
+import com.nuvio.app.core.ui.DesktopTextInputFocusTracker
 import java.awt.GraphicsEnvironment
 import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
@@ -264,5 +265,9 @@ private fun KeyEvent.isDesktopAppFullscreenShortcut(): Boolean {
         modifiers and KeyEvent.META_DOWN_MASK != 0 &&
             modifiers and KeyEvent.CTRL_DOWN_MASK != 0 &&
             modifiers and KeyEvent.ALT_DOWN_MASK == 0
-    return hasMacFullscreenModifiers
+    if (hasMacFullscreenModifiers) return true
+    // Plain F (no modifiers) also toggles fullscreen through this same shortcut path.
+    // Guarded against text-input focus so it doesn't hijack typing "f" into a search box, etc.
+    if (modifiers != 0) return false
+    return !DesktopTextInputFocusTracker.isFocused
 }

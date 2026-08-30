@@ -85,6 +85,7 @@ fun DesktopDetailHero(
     onWatchedClick: () -> Unit,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    playFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val bottomGradientColor = heroGradientColor ?: colorScheme.background
@@ -293,6 +294,7 @@ fun DesktopDetailHero(
                 isTablet = true,
                 onPlayClick = onPlayClick,
                 onPlayLongClick = onPlayLongClick,
+                playFocusRequester = playFocusRequester,
             )
         }
 
@@ -334,6 +336,7 @@ fun DesktopDetailHero(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = space.s32, end = actionHorizontalInset),
+                focusable = false,
                 buttonSize = 48.dp,
                 iconSize = 24.dp,
                 containerColor = colorScheme.surfaceVariant.copy(alpha = 0.82f),

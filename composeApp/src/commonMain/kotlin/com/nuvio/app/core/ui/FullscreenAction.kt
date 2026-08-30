@@ -3,6 +3,7 @@ package com.nuvio.app.core.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -22,6 +24,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.focus.dpadFocusRing
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_exit_fullscreen
 import nuvio.composeapp.generated.resources.action_fullscreen
@@ -46,6 +49,7 @@ internal fun fullscreenActionHorizontalInsetForWidth(maxWidthDp: Float): Dp =
 internal fun FullscreenActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    focusable: Boolean = true,
     buttonSize: Dp = 40.dp,
     iconSize: Dp = 24.dp,
     containerColor: Color = Color.Transparent,
@@ -61,15 +65,28 @@ internal fun FullscreenActionButton(
             Res.string.action_fullscreen
         },
     )
+    val interactionSource = remember { MutableInteractionSource() }
 
     Box(
         modifier = modifier
             .size(buttonSize)
+            .dpadFocusRing(
+                interactionSource = interactionSource,
+                cornerRadius = NuvioTokens.Radius.full,
+                scale = false,
+            )
+            // Some hosts (e.g. the detail screen's hero/floating header) want this button
+            // reachable by mouse/touch only, without it being a stop in D-pad/keyboard focus
+            // traversal. canFocus = false removes it from focus search while leaving clicks
+            // unaffected (see the same pattern in HomeHeroSection).
+            .then(if (!focusable) Modifier.focusProperties { canFocus = false } else Modifier)
             .clip(CircleShape)
             .background(containerColor)
             .clickable(
                 enabled = enabled,
                 role = Role.Button,
+                interactionSource = interactionSource,
+                indication = null,
                 onClick = ::toggleFullscreenAction,
             )
             .semantics {

@@ -530,6 +530,7 @@
     <string name="compose_settings_root_integrations_description">Manage available integrations</string>
     <string name="compose_settings_root_notifications_description">Manage episode release alerts and send a test notification.</string>
     <string name="compose_settings_root_privacy_policy_description">Learn how Nuvio handles your data</string>
+    <string name="compose_settings_root_shortcuts_section">SHORTCUTS</string>
     <string name="compose_settings_root_streams_description">Stream result display and badge URL rules.</string>
     <string name="compose_settings_root_switch_profile_description">Change to a different profile.</string>
     <string name="compose_settings_root_switch_profile_title">Switch Profile</string>
@@ -2299,4 +2300,38 @@
         <item quantity="one">%d title</item>
         <item quantity="other">%d titles</item>
     </plurals>
+    <string name="compose_settings_page_shortcuts">Shortcuts</string>
+    <string name="compose_settings_root_shortcuts_description">Configure your keyboard and mouse shortcuts here.</string>
+    <string name="settings_shortcuts_section_general_navigation">GENERAL &amp; NAVIGATION</string>
+    <string name="settings_shortcuts_section_player_playback">PLAYER – PLAYBACK</string>
+    <string name="settings_shortcuts_key_combo_separator">or</string>
+    <string name="settings_shortcuts_navigate_focus">Move focus between items</string>
+    <string name="settings_shortcuts_switch_collection_tabs">Switch collection tabs</string>
+    <string name="settings_shortcuts_go_home">Go to Home</string>
+    <string name="settings_shortcuts_go_search">Go to Search</string>
+    <string name="settings_shortcuts_go_library">Go to Library</string>
+    <string name="settings_shortcuts_go_settings">Go to Settings</string>
+    <string name="settings_shortcuts_open_search_focused">Open Search and start typing</string>
+    <string name="settings_shortcuts_toggle_fullscreen">Toggle fullscreen</string>
+    <string name="settings_shortcuts_go_back">Go back</string>
+    <string name="settings_shortcuts_close_player">Close player</string>
+    <string name="settings_shortcuts_navigate_options">Navigate options</string>
+
+    <string name="settings_shortcuts_audio_selector">Audio selector</string>
+    <string name="settings_shortcuts_subtitle_selector">Subtitle selector</string>
+    <string name="settings_shortcuts_episode_list">Episode list</string>
+    <string name="settings_shortcuts_source_list">Source list</string>
+    <string name="settings_shortcuts_toggle_subtitle">Toggle subtitle</string>
+    <string name="settings_shortcuts_sequential_audio">Sequential switch audio track</string>
+    <string name="settings_shortcuts_hold_to_speed">Hold to speed up</string>
+    <string name="settings_shortcuts_skip_intro">Skip intro</string>
+    <string name="settings_shortcuts_next_episode">Play next episode</string>
+    <string name="settings_shortcuts_playback_speed">Playback speed control</string>
+    <string name="settings_shortcuts_reset_playback_speed">Reset playback speed</string>
+    <string name="settings_shortcuts_play_pause">Play/Pause</string>
+    <string name="settings_shortcuts_subtitle_delay">Subtitle delay control</string>
+    <string name="settings_shortcuts_toggle_mute">Toggle mute</string>
+    <string name="settings_shortcuts_volume_control">Volume control</string>
+    <string name="settings_shortcuts_toggle_sub_opacity">Toggle subtitle opacity</string>
+    <string name="settings_shortcuts_sub_opacity_control">Subtitle opacity control</string>
 </resources>

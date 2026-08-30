@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -244,6 +254,20 @@ fun MetaDetailsScreen(
     val trackingListsUpdateFailedMessage = stringResource(Res.string.tracking_lists_update_failed)
     var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
     var deferredMetaWorkAllowed by remember(type, id) { mutableStateOf(false) }
+
+    val playFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val detailScreenFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    // Focus should stay invisible until the user actually presses an arrow key - see the
+    // catcher wired onto the screen's root Box below. Re-armed whenever the displayed item
+    // changes (new detail screen content), matching the same re-arm-on-navigation pattern used
+    // by Home's `hasRequestedInitialFocus`.
+    var hasActivatedDpadNav by remember(displayedMeta?.id) { mutableStateOf(false) }
+
+    LaunchedEffect(displayedMeta) {
+        if (displayedMeta != null) {
+            runCatching { detailScreenFocusRequester.requestFocus() }
+        }
+    }
 
     LaunchedEffect(
         displayedMeta?.id,
@@ -999,7 +1023,30 @@ fun MetaDetailsScreen(
                         label = "detail_dominant_backdrop_color",
                     )
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .focusRequester(detailScreenFocusRequester)
+                            .focusable()
+                            .onKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && !hasActivatedDpadNav) {
+                                    val direction = when (event.key) {
+                                        Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight -> true
+                                        else -> false
+                                    }
+                                    if (direction) {
+                                        // First arrow press only reveals focus at the Play button
+                                        // (the screen's navigation origin) - it doesn't also move
+                                        // from there, so the very next press is a normal, real
+                                        // directional move handled by dpadNavigationContainer below.
+                                        val activated = runCatching { playFocusRequester.requestFocus() }.isSuccess
+                                        if (activated) hasActivatedDpadNav = true
+                                        return@onKeyEvent activated
+                                    }
+                                }
+                                false
+                            },
+                    ) {
                         when (backgroundMode) {
                             MetaScreenBackgroundMode.Normal -> Unit
                             MetaScreenBackgroundMode.Cinematic -> if (deferredMetaWorkAllowed && backdropUrl != null) {
@@ -1030,7 +1077,8 @@ fun MetaDetailsScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .nestedScroll(heroStretchState.nestedScrollConnection)
-                                .zIndex(1f),
+                                .zIndex(1f)
+                                .dpadNavigationContainer(),
                         ) {
                             if (useDesktopDetailLayout) {
                                 item(
@@ -1074,6 +1122,7 @@ fun MetaDetailsScreen(
                                         onWatchedClick = toggleWatched,
                                         onSaveClick = toggleSaved,
                                         onSaveLongClick = openLibraryListPicker,
+                                        playFocusRequester = playFocusRequester,
                                     )
                                 }
                                 configuredMetaSectionItems(
@@ -1157,6 +1206,7 @@ fun MetaDetailsScreen(
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,
                                     animatedVisibilityScope = animatedVisibilityScope,
+                                    playFocusRequester = playFocusRequester,
                                 )
                             } else {
                                 item(
@@ -1274,6 +1324,7 @@ fun MetaDetailsScreen(
                                     onCompanyClick = onCompanyClick,
                                     sharedTransitionScope = sharedTransitionScope,
                                     animatedVisibilityScope = animatedVisibilityScope,
+                                    playFocusRequester = playFocusRequester,
                                 )
                             }
 
@@ -1326,6 +1377,7 @@ fun MetaDetailsScreen(
                                 ).zIndex(2f),
                                 containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onBackground,
+                                focusable = false,
                             )
                         }
 
@@ -1340,6 +1392,7 @@ fun MetaDetailsScreen(
                                 contentColor = MaterialTheme.colorScheme.onBackground,
                                 buttonSize = 48.dp,
                                 iconSize = 24.dp,
+                                focusable = false,
                             )
                         }
 
@@ -1912,6 +1965,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
+    playFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val enabledItems = settings.items.filter { it.enabled }
     fun sectionHasContent(key: MetaScreenSectionKey): Boolean =
@@ -1988,6 +2042,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onCompanyClick = onCompanyClick,
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
+                    playFocusRequester = playFocusRequester,
                 )
             }
         }
@@ -2137,6 +2192,7 @@ private fun ConfiguredMetaSections(
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
     sharedTransitionScope: SharedTransitionScope?,
     animatedVisibilityScope: AnimatedVisibilityScope?,
+    playFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
 ) {
     val enabledItems = settings.items.filter { it.enabled }
 
@@ -2196,6 +2252,7 @@ private fun ConfiguredMetaSections(
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
+                    playFocusRequester = playFocusRequester,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {

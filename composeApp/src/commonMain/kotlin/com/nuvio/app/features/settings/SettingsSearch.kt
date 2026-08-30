@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -113,6 +114,7 @@ internal fun settingsSearchEntries(
     val continueWatchingPage = stringResource(Res.string.compose_settings_page_continue_watching)
     val posterStylePage = stringResource(Res.string.compose_settings_page_poster_customization)
     val hoverPreviewPage = stringResource(Res.string.compose_settings_page_hover_preview)
+    val shortcutsPage = stringResource(Res.string.compose_settings_page_shortcuts)
     val addonsPage = stringResource(Res.string.compose_settings_page_addons)
     val pluginsPage = stringResource(Res.string.compose_settings_page_plugins)
     val collectionsPage = stringResource(Res.string.collections_header)
@@ -478,6 +480,16 @@ internal fun settingsSearchEntries(
             title = hoverPreviewPage,
             description = stringResource(Res.string.settings_appearance_hover_preview_description),
             icon = Icons.Rounded.Style,
+        )
+    }
+
+    if (isDesktop) {
+        addPage(
+            page = SettingsPage.Shortcuts,
+            key = "shortcuts",
+            title = shortcutsPage,
+            description = stringResource(Res.string.compose_settings_root_shortcuts_description),
+            icon = Icons.Rounded.Keyboard,
         )
     }
 

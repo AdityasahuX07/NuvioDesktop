@@ -48,6 +48,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.dpadFocusGapPadding
+import com.nuvio.app.core.ui.focus.DpadFocusGap
+
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -705,10 +710,17 @@ private fun EpisodeHorizontalCard(
     } else {
         metrics.contentBottomPadding
     }
+    val episodeInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Box(
         modifier = Modifier
             .width(metrics.cardWidth)
             .height(metrics.cardHeight)
+            .dpadFocusRing(
+                interactionSource = episodeInteractionSource,
+                cornerRadius = metrics.cornerRadius,
+                gap = com.nuvio.app.core.ui.focus.DpadFocusGap,
+            )
+            .dpadFocusGapPadding(interactionSource = episodeInteractionSource)
             .clip(cardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .nuvioCardDepth(
@@ -721,6 +733,8 @@ private fun EpisodeHorizontalCard(
                 onLongClick = onLongPress,
                 zoomImageUrl = imageUrl,
                 zoomCornerRadius = metrics.cornerRadius,
+                interactionSource = episodeInteractionSource,
+                drawFocusRing = false,
             ),
     ) {
         val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
@@ -1077,10 +1091,17 @@ private fun EpisodeListCard(
     val cardShape = RoundedCornerShape(sizing.cardRadius)
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
+    val episodeInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(sizing.cardHeight)
+            .dpadFocusRing(
+                interactionSource = episodeInteractionSource,
+                cornerRadius = sizing.cardRadius,
+                gap = com.nuvio.app.core.ui.focus.DpadFocusGap,
+            )
+            .dpadFocusGapPadding(interactionSource = episodeInteractionSource)
             .clip(cardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .border(
@@ -1089,6 +1110,8 @@ private fun EpisodeListCard(
                 shape = cardShape,
             )
             .combinedClickable(
+                interactionSource = episodeInteractionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
                 enabled = onClick != null || onLongPress != null,
                 onClick = { onClick?.invoke() },
                 onLongClick = onLongPress,

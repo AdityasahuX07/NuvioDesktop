@@ -39,6 +39,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.FullscreenActionButton
 import com.nuvio.app.core.ui.NuvioDesktopImageScaling
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.FocusOverflowReserve
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.isFullscreenActionSupported
@@ -114,9 +125,15 @@ fun HomeHeroSection(
     val coroutineScope = rememberCoroutineScope()
     var pagerDragActive by remember { mutableStateOf(false) }
     val autoScrollPage = pagerState.currentPage
+    val homeFocusCoordinatorForAutoScroll = LocalHomeFocusCoordinator.current
+    val heroButtonHasFocus = homeFocusCoordinatorForAutoScroll?.isHeroButtonFocused?.value ?: false
 
-    LaunchedEffect(autoScrollPage, items.size) {
+    LaunchedEffect(autoScrollPage, items.size, heroButtonHasFocus) {
         if (items.size <= 1) return@LaunchedEffect
+        // Don't rotate to a new page while the "View Details" button has real keyboard focus -
+        // rotating swaps in a different page's composable instance, which orphans the currently
+        // focused node (see HomeFocusCoordinator.isHeroButtonFocused for the full explanation).
+        if (heroButtonHasFocus) return@LaunchedEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
             delay(100L)
@@ -331,6 +348,8 @@ private fun HeroDesktopContentLayers(
         itemCount = items.size,
         includePagerNeighbors = includePagerNeighbors,
     )
+    val coroutineScope = rememberCoroutineScope()
+    val homeFocusCoordinatorForNav = LocalHomeFocusCoordinator.current
 
     layerPages.forEach { page ->
         Box(
@@ -347,6 +366,40 @@ private fun HeroDesktopContentLayers(
                 item = items[page],
                 layout = layout,
                 onItemClick = onItemClick,
+                isActivePage = page == pagerState.currentPage,
+                onNavigatePreviousPage = {
+                    if (items.size > 1) {
+                        val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(prevPage)
+                            // Only the active page's button is ever focusable (see
+                            // DesktopHeroContentBlock) - once the pager settles on the new page,
+                            // that page's button becomes the one attached to this shared
+                            // requester, but nothing focuses it automatically. Without this, the
+                            // old page's button loses focusability the moment the page changes,
+                            // real focus is orphaned, and every press after the first one has
+                            // nowhere to go. The short delay gives Compose a chance to actually
+                            // recompose with the new isActivePage values (and attach the
+                            // requester to the new page's node) before we request focus on it.
+                            delay(50L)
+                            homeFocusCoordinatorForNav?.let {
+                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                            }
+                        }
+                    }
+                },
+                onNavigateNextPage = {
+                    if (items.size > 1) {
+                        val nextPage = (pagerState.currentPage + 1) % items.size
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(nextPage)
+                            delay(50L)
+                            homeFocusCoordinatorForNav?.let {
+                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                            }
+                        }
+                    }
+                },
             )
         }
     }
@@ -578,12 +631,22 @@ private fun DesktopHomeHeroFrame(
         }
 
         if (isFullscreenActionSupported) {
+            val homeFocusCoordinatorForFullscreen = LocalHomeFocusCoordinator.current
             FullscreenActionButton(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(
                         top = space.s32,
                         end = contentHorizontalPadding,
+                    )
+                    .then(
+                        if (homeFocusCoordinatorForFullscreen != null) {
+                            Modifier.focusProperties {
+                                down = homeFocusCoordinatorForFullscreen.heroViewDetailsFocusRequester
+                            }
+                        } else {
+                            Modifier
+                        },
                     ),
                 buttonSize = 48.dp,
                 iconSize = 24.dp,
@@ -815,6 +878,9 @@ private fun DesktopHeroContentBlock(
     item: MetaPreview,
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
+    isActivePage: Boolean = true,
+    onNavigatePreviousPage: () -> Unit = {},
+    onNavigateNextPage: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var logoLoadError by remember(item.type, item.id, item.logo) {
@@ -904,13 +970,70 @@ private fun DesktopHeroContentBlock(
         if (onItemClick != null) {
             Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
             Row(
+                modifier = Modifier.padding(vertical = FocusOverflowReserve),
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val homeFocusCoordinator = LocalHomeFocusCoordinator.current
+                val heroButtonInteractionSource = remember { MutableInteractionSource() }
                 Surface(
                     modifier = Modifier
                         .height(48.dp)
-                        .clickable { onItemClick(item) },
+                        .then(
+                            // Only the pager's currently-active page should ever wire up the
+                            // shared hero FocusRequester - the parallax carousel also renders
+                            // neighbor pages simultaneously (mostly transparent) for the swipe
+                            // effect, and attaching the same FocusRequester to more than one node
+                            // at once causes Compose to silently reassign real focus to whichever
+                            // page last attached it, which is what made the "bigger" indicator
+                            // only ever seem to work the first time.
+                            if (homeFocusCoordinator != null && isActivePage) {
+                                Modifier
+                                    .focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester)
+                                    .focusProperties { down = homeFocusCoordinator.downFromHeroTarget() }
+                                    .onFocusChanged { state ->
+                                        homeFocusCoordinator.isHeroButtonFocused.value = state.isFocused
+                                    }
+                                    .onKeyEvent { event ->
+                                        if (event.type != KeyEventType.KeyDown) {
+                                            false
+                                        } else {
+                                            when (event.key) {
+                                                Key.DirectionLeft -> {
+                                                    onNavigatePreviousPage()
+                                                    true
+                                                }
+                                                Key.DirectionRight -> {
+                                                    onNavigateNextPage()
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        }
+                                    }
+                                    .dpadFocusRing(
+                                        interactionSource = heroButtonInteractionSource,
+                                        cornerRadius = 40.dp,
+                                        scaleFactor = 1.08f,
+                                    )
+                            } else {
+                                // Inactive parallax-neighbor pages render a fully clickable (mouse)
+                                // button at nearly the same on-screen position as the active
+                                // page's - without this, Compose's spatial moveFocus() (used by,
+                                // e.g., the fullscreen button's Down press, or any keyboard nav
+                                // that isn't going through the explicit FocusRequester/
+                                // focusProperties wiring above) could land on a neighbor's
+                                // unwired button instead of the active page's, which is what made
+                                // Hero seem to stop being reachable after the first successful
+                                // focus. canFocus = false removes inactive pages from focus/D-pad
+                                // search entirely while leaving mouse clicks unaffected.
+                                Modifier.focusProperties { canFocus = false }
+                            },
+                        )
+                        .clickable(
+                            interactionSource = heroButtonInteractionSource,
+                            indication = null,
+                        ) { onItemClick(item) },
                     color = colorScheme.onBackground,
                     contentColor = colorScheme.background,
                     shape = RoundedCornerShape(40.dp),

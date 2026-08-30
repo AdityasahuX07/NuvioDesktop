@@ -4,8 +4,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -30,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -40,6 +44,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.appIconPainter
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
 import com.nuvio.app.core.ui.secondaryClick
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_play
@@ -64,6 +70,7 @@ fun DetailActionButtons(
     isTablet: Boolean = false,
     onPlayClick: () -> Unit = {},
     onPlayLongClick: (() -> Unit)? = null,
+    playFocusRequester: FocusRequester? = null,
 ) {
     val playPainter = appIconPainter(AppIconResource.PlayerPlay)
     val buttonHeight = if (isTablet) 56.dp else 52.dp
@@ -82,7 +89,8 @@ fun DetailActionButtons(
         modifier = modifier
             .widthIn(max = if (isTablet) 520.dp else 420.dp)
             .fillMaxWidth()
-            .height(buttonHeight),
+            .height(buttonHeight)
+            .dpadNavigationContainer(),
     ) {
         Row(
             modifier = Modifier
@@ -91,10 +99,19 @@ fun DetailActionButtons(
             horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val playInteractionSource = remember { MutableInteractionSource() }
             Surface(
                 modifier = Modifier
                     .weight(1f)
-                    .height(buttonHeight),
+                    .height(buttonHeight)
+                    .then(
+                        if (playFocusRequester != null) Modifier.focusRequester(playFocusRequester) else Modifier
+                    )
+                    .dpadFocusRing(
+                        interactionSource = playInteractionSource,
+                        cornerRadius = 40.dp,
+                        scaleFactor = 1.08f,
+                    ),
                 shape = playShape,
                 color = MaterialTheme.colorScheme.onBackground,
                 contentColor = MaterialTheme.colorScheme.background,
@@ -103,9 +120,9 @@ fun DetailActionButtons(
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(
-                            onClick = {
-                                onPlayClick()
-                            },
+                            interactionSource = playInteractionSource,
+                            indication = LocalIndication.current,
+                            onClick = onPlayClick,
                             onLongClick = onPlayLongClick,
                             role = Role.Button,
                         )
@@ -134,7 +151,15 @@ fun DetailActionButtons(
             }
 
             if (hasSecondaryActions) {
-                Spacer(modifier = Modifier.width(12.dp))
+                // Static, not focus-animated: the play button's own focus scale bump (1.08x,
+                // above) is a paint-time transform, so if this gap's *layout* width also changed
+                // on focus, the Row's weight(1f) would recompute the button's measured width on
+                // every animation frame while the scale was independently animating too - two
+                // separate spring animations fighting over the same region reads as a shake/jitter
+                // instead of a single smooth pop. Reserving the room unconditionally means only
+                // the scale transform ever animates, and the button's underlying layout width
+                // never moves.
+                Spacer(modifier = Modifier.width(30.dp))
                 secondaryActions.forEachIndexed { index, action ->
                     Box(
                         modifier = Modifier
@@ -174,8 +199,15 @@ fun DetailActionButtons(
             }
 
             if (hasSecondaryActions) {
+                val menuInteractionSource = remember { MutableInteractionSource() }
                 Surface(
-                    modifier = Modifier.size(iconButtonSize),
+                    modifier = Modifier
+                        .size(iconButtonSize)
+                        .dpadFocusRing(
+                            interactionSource = menuInteractionSource,
+                            cornerRadius = iconButtonSize / 2,
+                            scaleFactor = 1.12f,
+                        ),
                     shape = CircleShape,
                     color = if (actionsExpanded) {
                         MaterialTheme.colorScheme.onBackground
@@ -191,7 +223,11 @@ fun DetailActionButtons(
                     Box(
                         modifier = Modifier
                             .size(iconButtonSize)
-                            .clickable(role = Role.Button) {
+                            .clickable(
+                                interactionSource = menuInteractionSource,
+                                indication = LocalIndication.current,
+                                role = Role.Button,
+                            ) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 actionsExpanded = !actionsExpanded
                             },
@@ -225,12 +261,31 @@ internal fun DetailIconAction(
     size: Dp,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
-        modifier = modifier.graphicsLayer {
-            alpha = progress
-            scaleX = 0.86f + (0.14f * progress)
-            scaleY = 0.86f + (0.14f * progress)
-        },
+        modifier = modifier
+            .graphicsLayer {
+                alpha = progress
+                scaleX = 0.86f + (0.14f * progress)
+                scaleY = 0.86f + (0.14f * progress)
+            }
+            .dpadFocusRing(
+                interactionSource = interactionSource,
+                cornerRadius = size / 2,
+                // These sit inside a tightly-fitted per-button Box that clips to the button's own
+                // unscaled bounds (needed for the width-collapse reveal/hide animation), so the
+                // usual focus scale-bump would get its edges cropped by that clip instead of
+                // rendering as a clean circle - same reasoning as FullscreenActionButton's
+                // `scale = false`. Border-only keeps the ring fully inside those bounds.
+                scale = false,
+                // When `active` (already in library / marked watched), this button's own fill is
+                // colorScheme.onBackground - the same tone as the default accent ring color in
+                // this app's (light-on-dark) theme, so the ring became invisible against its own
+                // button. Use the "inactive" fill color instead in that state: it's exactly the
+                // dark-gray tone this button shows when not active, so it reads as a clear ring
+                // against the active (light) fill without needing a new color.
+                color = if (active) MaterialTheme.colorScheme.surfaceVariant else null,
+            ),
         shape = CircleShape,
         color = if (active) {
             MaterialTheme.colorScheme.onBackground
@@ -248,6 +303,8 @@ internal fun DetailIconAction(
             modifier = Modifier
                 .size(size)
                 .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
                     onClick = onClick,
                     onLongClick = onLongClick,
                     role = Role.Button,

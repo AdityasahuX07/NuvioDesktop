@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.nuvio.app.core.ui.focus.dpadNavigationContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -162,7 +163,8 @@ fun NuvioNavigationBar(
                     .padding(
                         horizontal = NuvioTokens.Space.s6,
                         vertical = NuvioTokens.Space.s4,
-                    ),
+                    )
+                    .dpadNavigationContainer(handleUpDown = false),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -399,7 +401,8 @@ fun NuvioClassicNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(nuvioBottomNavigationBarInsets().asPaddingValues())
-                .padding(horizontal = NuvioTokens.Space.s4, vertical = nuvioBottomNavigationExtraVerticalPadding),
+                .padding(horizontal = NuvioTokens.Space.s4, vertical = nuvioBottomNavigationExtraVerticalPadding)
+                .dpadNavigationContainer(handleUpDown = false),
             horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap, Alignment.CenterHorizontally),
         ) {
             NuvioClassicNavigationBarScopeImpl(this).content()

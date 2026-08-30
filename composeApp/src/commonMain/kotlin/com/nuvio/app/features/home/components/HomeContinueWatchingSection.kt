@@ -2,6 +2,7 @@ package com.nuvio.app.features.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -47,6 +50,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.DisintegratingContainer
 import com.nuvio.app.core.ui.DisintegrationRequest
+import com.nuvio.app.core.ui.focus.dpadFocusGapPadding
+import com.nuvio.app.core.ui.focus.dpadFocusRing
+import com.nuvio.app.core.ui.focus.DpadFocusGap
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioProgressBar
@@ -251,6 +257,7 @@ internal fun HomeContinueWatchingSection(
     onItemClick: ((ContinueWatchingItem) -> Unit)? = null,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     disintegrationRequest: DisintegrationRequest<String>? = null,
+    firstItemFocusRequester: FocusRequester? = null,
 ) {
     if (items.isEmpty()) return
 
@@ -269,6 +276,7 @@ internal fun HomeContinueWatchingSection(
             onItemClick = onItemClick,
             onItemLongPress = onItemLongPress,
             disintegrationRequest = disintegrationRequest,
+            firstItemFocusRequester = firstItemFocusRequester,
         )
     } else {
         BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -286,6 +294,7 @@ internal fun HomeContinueWatchingSection(
                 onItemClick = onItemClick,
                 onItemLongPress = onItemLongPress,
                 disintegrationRequest = disintegrationRequest,
+                firstItemFocusRequester = firstItemFocusRequester,
             )
         }
     }
@@ -306,6 +315,7 @@ private fun HomeContinueWatchingSectionContent(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
     disintegrationRequest: DisintegrationRequest<String>?,
+    firstItemFocusRequester: FocusRequester? = null,
 ) {
     key(dataSourceKey) {
         val disintegration = remember {
@@ -314,6 +324,8 @@ private fun HomeContinueWatchingSectionContent(
             )
         }
         val displayEntries = disintegration.sync(dataSourceKey, items, disintegrationRequest)
+        val homeFocusCoordinator = LocalHomeFocusCoordinator.current
+        val firstEntryKey = displayEntries.firstOrNull()?.key
 
         NuvioShelfSection(
             title = title ?: stringResource(Res.string.compose_settings_page_continue_watching),
@@ -329,6 +341,12 @@ private fun HomeContinueWatchingSectionContent(
             val item = entry.item
             val onClick = if (entry.exiting) null else onItemClick?.let { { it(item) } }
             val onLongClick = if (entry.exiting) null else onItemLongPress?.let { { it(item) } }
+            val isFirstItem = firstItemFocusRequester != null && entry.key == firstEntryKey
+            val firstItemUpModifier = if (isFirstItem && homeFocusCoordinator != null) {
+                Modifier.focusProperties { up = homeFocusCoordinator.heroViewDetailsFocusRequester }
+            } else {
+                Modifier
+            }
             DisintegratingContainer(
                 disintegrating = entry.exiting,
                 onDisintegrated = { disintegration.onDisintegrated(entry.key) },
@@ -340,6 +358,8 @@ private fun HomeContinueWatchingSectionContent(
                         blurNextUp = blurNextUp,
                         onClick = onClick,
                         onLongClick = onLongClick,
+                        focusRequester = if (isFirstItem) firstItemFocusRequester else null,
+                        modifier = firstItemUpModifier,
                     )
                     ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
                         item = item,
@@ -348,6 +368,8 @@ private fun HomeContinueWatchingSectionContent(
                         blurNextUp = blurNextUp,
                         onClick = onClick,
                         onLongClick = onLongClick,
+                        focusRequester = if (isFirstItem) firstItemFocusRequester else null,
+                        modifier = firstItemUpModifier,
                     )
                     ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
                         item = item,
@@ -356,6 +378,8 @@ private fun HomeContinueWatchingSectionContent(
                         blurNextUp = blurNextUp,
                         onClick = onClick,
                         onLongClick = onLongClick,
+                        focusRequester = if (isFirstItem) firstItemFocusRequester else null,
+                        modifier = firstItemUpModifier,
                     )
                 }
             }
@@ -644,6 +668,8 @@ private fun ContinueWatchingCard(
     blurNextUp: Boolean,
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
+    focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
     val cardMetrics = remember(posterCardStyle.widthDp, posterCardStyle.cornerRadiusDp) {
@@ -683,10 +709,18 @@ private fun ContinueWatchingCard(
         else -> backgroundColor.copy(alpha = 0.80f)
     }
 
+    val posterInteractionSource = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .width(cardMetrics.width)
             .aspectRatio(PosterLandscapeAspectRatio)
+            .then(modifier)
+            .dpadFocusRing(
+                interactionSource = posterInteractionSource,
+                cornerRadius = cardMetrics.cornerRadius,
+                gap = DpadFocusGap,
+            )
+            .dpadFocusGapPadding(interactionSource = posterInteractionSource)
             .clip(RoundedCornerShape(cardMetrics.cornerRadius))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .nuvioCardDepth(
@@ -698,6 +732,9 @@ private fun ContinueWatchingCard(
                 onLongClick = onLongClick,
                 zoomImageUrl = imageUrl,
                 zoomCornerRadius = cardMetrics.cornerRadius,
+                interactionSource = posterInteractionSource,
+                drawFocusRing = false,
+                focusRequester = focusRequester,
             ),
     ) {
         if (imageUrl != null) {
@@ -860,10 +897,13 @@ private fun ContinueWatchingWideCard(
     blurNextUp: Boolean,
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
+    focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = Modifier
-            .posterCardClickable(onClick = onClick, onLongClick = onLongClick)
+            .then(modifier)
+            .posterCardClickable(onClick = onClick, onLongClick = onLongClick, focusRequester = focusRequester)
             .width(layout.wideCardWidth)
             .height(layout.wideCardHeight)
             .clip(RoundedCornerShape(layout.cardRadius))
@@ -986,6 +1026,8 @@ private fun ContinueWatchingPosterCard(
     blurNextUp: Boolean,
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
+    focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
     Column(
@@ -994,10 +1036,18 @@ private fun ContinueWatchingPosterCard(
             .width(layout.posterCardWidth),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val posterInteractionSource = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(layout.posterCardHeight)
+                .then(modifier)
+                .dpadFocusRing(
+                    interactionSource = posterInteractionSource,
+                    cornerRadius = layout.cardRadius,
+                    gap = DpadFocusGap,
+                )
+                .dpadFocusGapPadding(interactionSource = posterInteractionSource)
                 .clip(RoundedCornerShape(layout.cardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .nuvioCardDepth(
@@ -1010,6 +1060,9 @@ private fun ContinueWatchingPosterCard(
                     zoomImageUrl = imageUrl,
                     zoomCornerRadius = layout.cardRadius,
                     hoverScaleEnabled = false,
+                    interactionSource = posterInteractionSource,
+                    drawFocusRing = false,
+                    focusRequester = focusRequester,
                 ),
         ) {
             val shouldBlurArtwork = item.shouldBlurContinueWatchingArtwork(

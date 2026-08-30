@@ -27,6 +27,8 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.PosterGridRow
 import com.nuvio.app.features.home.components.PosterGridSkeletonRow
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
+import com.nuvio.app.features.home.stableKey
+import androidx.compose.ui.focus.FocusRequester
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -42,6 +44,7 @@ internal fun LazyListScope.discoverContent(
     fullyWatchedSeriesKeys: Set<String> = emptySet(),
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    firstPosterFocusRequester: FocusRequester? = null,
 ) {
     item {
         DiscoverSectionHeader(modifier = Modifier.padding(horizontal = 16.dp))
@@ -96,6 +99,7 @@ internal fun LazyListScope.discoverContent(
         }
 
         else -> {
+            val firstItemKey = state.items.firstOrNull()?.stableKey()
             items(state.items.chunked(columns)) { rowItems ->
                 PosterGridRow(
                     items = rowItems,
@@ -105,6 +109,11 @@ internal fun LazyListScope.discoverContent(
                     fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     onPosterClick = onPosterClick,
                     onPosterLongClick = onPosterLongClick,
+                    focusRequesterFor = if (firstPosterFocusRequester != null) {
+                        { preview -> firstPosterFocusRequester.takeIf { preview.stableKey() == firstItemKey } }
+                    } else {
+                        null
+                    },
                 )
             }
             if (state.isLoading) {

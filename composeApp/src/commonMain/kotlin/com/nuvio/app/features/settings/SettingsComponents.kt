@@ -140,6 +140,7 @@ internal fun TabletPageHeader(
                     contentColor = tokens.colors.textPrimary,
                     buttonSize = NuvioTokens.Space.s36,
                     iconSize = tokens.icons.md,
+                    focusRingCornerRadius = NuvioTokens.Radius.compactCard,
                 )
             }
             Text(

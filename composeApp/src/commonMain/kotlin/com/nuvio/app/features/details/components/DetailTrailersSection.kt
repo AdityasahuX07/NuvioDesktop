@@ -1,7 +1,9 @@
 package com.nuvio.app.features.details.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -41,6 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.focus.DpadFocusGap
+import com.nuvio.app.core.ui.focus.dpadFocusGapPadding
+import com.nuvio.app.core.ui.focus.dpadFocusRing
 import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.nuvioDesktopDragScroll
 import com.nuvio.app.core.ui.nuvioHorizontalScrollBleed
@@ -105,13 +110,21 @@ fun DetailTrailersSection(
                 }
 
                 Box {
+                    val selectorInteractionSource = remember { MutableInteractionSource() }
                     Surface(
                         shape = RoundedCornerShape(sizing.selectorRadius),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                         tonalElevation = 0.dp,
                         modifier = Modifier
+                            .dpadFocusRing(
+                                interactionSource = selectorInteractionSource,
+                                cornerRadius = sizing.selectorRadius,
+                            )
                             .clip(RoundedCornerShape(sizing.selectorRadius))
-                            .clickable { menuExpanded = true },
+                            .clickable(
+                                interactionSource = selectorInteractionSource,
+                                indication = LocalIndication.current,
+                            ) { menuExpanded = true },
                     ) {
                         Row(
                             modifier = Modifier.padding(
@@ -206,15 +219,26 @@ private fun TrailerCard(
         modifier = Modifier.width(cardWidth),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val trailerInteractionSource = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .dpadFocusRing(
+                    interactionSource = trailerInteractionSource,
+                    cornerRadius = cornerRadius,
+                    gap = DpadFocusGap,
+                )
+                .dpadFocusGapPadding(interactionSource = trailerInteractionSource)
                 .clip(RoundedCornerShape(cornerRadius))
                 .nuvioCardDepth(
                     shape = RoundedCornerShape(cornerRadius),
                     surface = NuvioCardDepthSurface.Trailers,
                 )
-                .clickable(onClick = onClick),
+                .clickable(
+                    interactionSource = trailerInteractionSource,
+                    indication = LocalIndication.current,
+                    onClick = onClick,
+                ),
         ) {
             AsyncImage(
                 model = "https://img.youtube.com/vi/${trailer.key}/hqdefault.jpg",

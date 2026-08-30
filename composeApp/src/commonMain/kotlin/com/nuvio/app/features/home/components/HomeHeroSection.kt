@@ -380,6 +380,7 @@ private fun HeroDesktopContentLayers(
     )
 
     layerPages.forEach { page ->
+        androidx.compose.runtime.key(page) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -420,6 +421,7 @@ private fun HeroDesktopContentLayers(
                     }
                 },
             )
+        }
         }
     }
 }

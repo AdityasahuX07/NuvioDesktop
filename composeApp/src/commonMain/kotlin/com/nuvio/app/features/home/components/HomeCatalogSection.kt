@@ -103,8 +103,8 @@ private fun HomeCatalogRowSectionContent(
             // boundary doesn't reliably cascade down to it. Setting it here, right on the same
             // node that becomes the actual focus target, is what makes it reliable (matches the
             // fullscreen button's working pattern).
-            modifier = if (isFirstPoster) {
-                Modifier.focusProperties { up = homeFocusCoordinator!!.heroViewDetailsFocusRequester }
+            modifier = if (isFirstFocusableRow && homeFocusCoordinator != null) {
+                  Modifier.focusProperties { up = homeFocusCoordinator!!.heroViewDetailsFocusRequester }
             } else {
                 Modifier
             },

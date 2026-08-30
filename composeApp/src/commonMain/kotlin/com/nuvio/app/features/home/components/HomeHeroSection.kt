@@ -395,15 +395,17 @@ private fun HeroDesktopContentLayers(
                 item = items[page],
                 layout = layout,
                 onItemClick = onItemClick,
-                isActivePage = page == pagerState.currentPage,
+                isActivePage = page == pagerState.targetPage,
                 onNavigatePreviousPage = {
                     if (items.size > 1) {
                         val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
                         coroutineScope.launch {
+                            homeFocusCoordinatorForNav?.isHeroFocusTransferring = true
                             pagerState.animateScrollToPage(prevPage)
                             delay(50L)
                             homeFocusCoordinatorForNav?.let {
                                 runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                                it.isHeroFocusTransferring = false
                             }
                         }
                     }
@@ -412,10 +414,12 @@ private fun HeroDesktopContentLayers(
                     if (items.size > 1) {
                         val nextPage = (pagerState.currentPage + 1) % items.size
                         coroutineScope.launch {
+                            homeFocusCoordinatorForNav?.isHeroFocusTransferring = true
                             pagerState.animateScrollToPage(nextPage)
                             delay(50L)
                             homeFocusCoordinatorForNav?.let {
                                 runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                                it.isHeroFocusTransferring = false
                             }
                         }
                     }
@@ -1029,7 +1033,7 @@ private fun DesktopHeroContentBlock(
                                         interactionSource = heroButtonInteractionSource,
                                         cornerRadius = 40.dp,
                                         scaleFactor = 1.08f,
-                                        isAlreadyFocused = homeFocusCoordinator?.isHeroButtonFocused?.value == true,
+                                        isAlreadyFocused = homeFocusCoordinator?.isHeroButtonFocused?.value == true || homeFocusCoordinator?.isHeroFocusTransferring == true,
                                     )
                             } else {
                                 Modifier.focusProperties { canFocus = false }

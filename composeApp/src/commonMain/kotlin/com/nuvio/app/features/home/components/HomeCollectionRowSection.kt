@@ -98,8 +98,8 @@ private fun HomeCollectionRowSectionContent(
             focusRequester = if (isFirstFolder) homeFocusCoordinator?.firstPosterFocusRequester else null,
             // See HomeCatalogSection.kt for why this is applied directly on the first item's own
             // modifier chain rather than on the shelf row's outer wrapper.
-            modifier = if (isFirstFolder) {
-                Modifier.focusProperties { up = homeFocusCoordinator!!.heroViewDetailsFocusRequester }
+            modifier = if (isFirstFocusableRow && homeFocusCoordinator != null) {
+                  Modifier.focusProperties { up = homeFocusCoordinator!!.heroViewDetailsFocusRequester }
             } else {
                 Modifier
             },

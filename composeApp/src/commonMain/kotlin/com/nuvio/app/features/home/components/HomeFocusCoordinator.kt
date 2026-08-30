@@ -36,6 +36,9 @@ class HomeFocusCoordinator {
      */
     var isHeroButtonFocused = mutableStateOf(false)
 
+    /** True when actively transferring focus between hero pages. */
+    var isHeroFocusTransferring = false
+
     /**
      * True once keyboard/D-pad navigation has been activated for the current visit to Home, so a
      * later arrow press doesn't re-steal focus on every recomposition. Home stays composed even

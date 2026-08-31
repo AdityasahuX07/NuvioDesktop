@@ -109,22 +109,24 @@ fun Modifier.dpadFocusRing(
 ): Modifier {
     val isInteractionFocused by interactionSource.collectIsFocusedAsState()
     val isFocused = isInteractionFocused || isAlreadyFocused
-    val borderWidth by animateDpAsState(
+    val borderWidthState by animateDpAsState(
         targetValue = if (isFocused) 3.dp else 0.dp,
-        animationSpec = spring(
+        animationSpec = if (isAlreadyFocused) androidx.compose.animation.core.snap() else spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
         ),
         label = "dpad_focus_border_width",
     )
-    val scaleValue by animateFloatAsState(
+    val scaleValueState by animateFloatAsState(
         targetValue = if (isFocused && scale) scaleFactor else 1f,
-        animationSpec = spring(
+        animationSpec = if (isAlreadyFocused) androidx.compose.animation.core.snap() else spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
         ),
         label = "dpad_focus_scale",
     )
+    val borderWidth = if (isAlreadyFocused) 3.dp else borderWidthState
+    val scaleValue = if (isAlreadyFocused && scale) scaleFactor else scaleValueState
     val accent = color ?: MaterialTheme.colorScheme.primary
     return this
         .then(

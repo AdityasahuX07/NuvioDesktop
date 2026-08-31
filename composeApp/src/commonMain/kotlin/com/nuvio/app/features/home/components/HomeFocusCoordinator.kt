@@ -35,6 +35,7 @@ class HomeFocusCoordinator {
      * hero pager reads this to pause auto-rotation for as long as the button holds real focus.
      */
     var isHeroButtonFocused = mutableStateOf(false)
+    var isFullscreenButtonFocused = mutableStateOf(false)
 
     /** True when actively transferring focus between hero pages. */
     var isHeroFocusTransferring = false

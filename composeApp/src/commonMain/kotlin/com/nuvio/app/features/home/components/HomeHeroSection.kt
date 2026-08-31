@@ -136,8 +136,13 @@ fun HomeHeroSection(
     val coroutineScope = rememberCoroutineScope()
     var pagerDragActive by remember { mutableStateOf(false) }
     val autoScrollPage = pagerState.currentPage
+    val homeFocusCoordinatorForAutoPager = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
+    val heroButtonHasFocus = homeFocusCoordinatorForAutoPager?.isHeroButtonFocused?.value == true || homeFocusCoordinatorForAutoPager?.isFullscreenButtonFocused?.value == true
 
-    LaunchedEffect(autoScrollPage, items.size) {
+    LaunchedEffect(autoScrollPage, items.size, homeFocusCoordinatorForAutoPager?.isHeroButtonFocused?.value, homeFocusCoordinatorForAutoPager?.isFullscreenButtonFocused?.value) {
+        if (items.size <= 1) return@LaunchedEffect
+        if (homeFocusCoordinatorForAutoPager?.isHeroButtonFocused?.value == true || homeFocusCoordinatorForAutoPager?.isFullscreenButtonFocused?.value == true) return@LaunchedEffect
+        delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         if (items.size <= 1) return@LaunchedEffect
         delay(HERO_AUTO_SCROLL_INTERVAL_MS)
         while (pagerState.isScrollInProgress) {
@@ -395,7 +400,8 @@ private fun HeroDesktopContentLayers(
                 item = items[page],
                 layout = layout,
                 onItemClick = onItemClick,
-                isActivePage = page == pagerState.targetPage,
+                isActivePage = page == pagerState.currentPage || page == pagerState.targetPage,
+                  isFocusRequesterTarget = page == pagerState.targetPage,
                 onNavigatePreviousPage = {
                     if (items.size > 1) {
                         val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
@@ -405,6 +411,7 @@ private fun HeroDesktopContentLayers(
                             delay(50L)
                             homeFocusCoordinatorForNav?.let {
                                 runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                                delay(150L)
                                 it.isHeroFocusTransferring = false
                             }
                         }
@@ -419,6 +426,7 @@ private fun HeroDesktopContentLayers(
                             delay(50L)
                             homeFocusCoordinatorForNav?.let {
                                 runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
+                                delay(150L)
                                 it.isHeroFocusTransferring = false
                             }
                         }
@@ -669,6 +677,9 @@ private fun DesktopHomeHeroFrame(
                                 Modifier.focusProperties {
                                     down = homeFocusCoordinatorForFullscreen.heroViewDetailsFocusRequester
                                 }.focusRequester(homeFocusCoordinatorForFullscreen.fullscreenButtonFocusRequester)
+                                .onFocusChanged { state ->
+                                    homeFocusCoordinatorForFullscreen.isFullscreenButtonFocused.value = state.isFocused
+                                }
                             } else {
                                 Modifier
                             }
@@ -905,6 +916,7 @@ private fun DesktopHeroContentBlock(
     layout: HomeHeroLayout,
     onItemClick: ((MetaPreview) -> Unit)?,
     isActivePage: Boolean = true,
+    isFocusRequesterTarget: Boolean = true,
     onNavigatePreviousPage: () -> Unit = {},
     onNavigateNextPage: () -> Unit = {},
 ) {
@@ -1007,8 +1019,11 @@ private fun DesktopHeroContentBlock(
                         .then(
                             if (homeFocusCoordinator != null && isActivePage) {
                                 Modifier
-                                    .focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester)
-                                    .focusProperties { down = homeFocusCoordinator.downFromHeroTarget() }
+                                    .then(if (isFocusRequesterTarget) Modifier.focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester) else Modifier)
+                                    .focusProperties { 
+                                        down = homeFocusCoordinator.downFromHeroTarget() 
+                                        up = homeFocusCoordinator.fullscreenButtonFocusRequester
+                                    }
                                     .onFocusChanged { state ->
                                         homeFocusCoordinator.isHeroButtonFocused.value = state.isFocused
                                     }

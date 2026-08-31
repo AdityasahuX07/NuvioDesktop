@@ -373,11 +373,8 @@ private fun HeroDesktopContentLayers(
     pagerState: PagerState,
     layout: HomeHeroLayout,
     heroWidthPx: Float,
-    onItemClick: ((MetaPreview) -> Unit)?,
     includePagerNeighbors: Boolean,
 ) {
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
-    val homeFocusCoordinatorForNav = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
     val layerPages = rememberHeroLayerPages(
         pagerState = pagerState,
         itemCount = items.size,
@@ -391,7 +388,6 @@ private fun HeroDesktopContentLayers(
                 .fillMaxWidth()
                 .graphicsLayer {
                     val pageOffset = heroPageOffset(pagerState, page)
-
                     alpha = heroPageVisibility(pageOffset)
                     translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
                 },
@@ -399,39 +395,8 @@ private fun HeroDesktopContentLayers(
             DesktopHeroContentBlock(
                 item = items[page],
                 layout = layout,
-                onItemClick = onItemClick,
                 isActivePage = page == pagerState.currentPage || page == pagerState.targetPage,
-                  isFocusRequesterTarget = page == pagerState.targetPage,
-                onNavigatePreviousPage = {
-                    if (items.size > 1) {
-                        val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
-                        coroutineScope.launch {
-                            homeFocusCoordinatorForNav?.isHeroFocusTransferring = true
-                            pagerState.animateScrollToPage(prevPage)
-                            delay(50L)
-                            homeFocusCoordinatorForNav?.let {
-                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
-                                delay(150L)
-                                it.isHeroFocusTransferring = false
-                            }
-                        }
-                    }
-                },
-                onNavigateNextPage = {
-                    if (items.size > 1) {
-                        val nextPage = (pagerState.currentPage + 1) % items.size
-                        coroutineScope.launch {
-                            homeFocusCoordinatorForNav?.isHeroFocusTransferring = true
-                            pagerState.animateScrollToPage(nextPage)
-                            delay(50L)
-                            homeFocusCoordinatorForNav?.let {
-                                runCatching { it.heroViewDetailsFocusRequester.requestFocus() }
-                                delay(150L)
-                                it.isHeroFocusTransferring = false
-                            }
-                        }
-                    }
-                },
+                isFocusRequesterTarget = page == pagerState.targetPage,
             )
         }
         }
@@ -645,9 +610,9 @@ private fun DesktopHomeHeroFrame(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(
-                        start = contentHorizontalPadding,
+                        start = contentHorizontalPadding + 4.dp,
                         end = space.s32,
-                        bottom = layout.contentVerticalPadding,
+                        bottom = layout.contentVerticalPadding + 12.dp + 48.dp + space.s24,
                     )
                     .fillMaxWidth(layout.contentWidthFraction)
                     .widthIn(max = layout.contentMaxWidth),
@@ -658,9 +623,105 @@ private fun DesktopHomeHeroFrame(
                     pagerState = pagerState,
                     layout = layout,
                     heroWidthPx = heroWidthPx,
-                    onItemClick = onItemClick,
                     includePagerNeighbors = includePagerNeighbors,
                 )
+            }
+
+            // The "View Details" button is rendered ONCE here at a fixed absolute
+            // position — completely outside the stacked content layers. This means
+            // it never moves or clips regardless of how tall/short each page's
+            // title+description content is during transitions.
+            if (onItemClick != null) {
+                val homeFocusCoordinator = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
+                val heroButtonInteractionSource = remember { MutableInteractionSource() }
+                val currentItem = items.getOrNull(
+                    pagerState.currentPage.coerceIn(0, items.lastIndex)
+                ) ?: items.first()
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(
+                            start = contentHorizontalPadding + 4.dp,
+                            bottom = layout.contentVerticalPadding + 12.dp,
+                        )
+                        .height(48.dp)
+                        .then(
+                            if (homeFocusCoordinator != null) {
+                                Modifier
+                                    .focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester)
+                                    .focusProperties {
+                                        down = homeFocusCoordinator.downFromHeroTarget()
+                                        up = homeFocusCoordinator.fullscreenButtonFocusRequester
+                                    }
+                                    .onFocusChanged { state ->
+                                        homeFocusCoordinator.isHeroButtonFocused.value = state.isFocused
+                                    }
+                                    .onKeyEvent { event ->
+                                        if (event.type != KeyEventType.KeyDown) {
+                                            false
+                                        } else when (event.key) {
+                                            Key.DirectionLeft -> {
+                                                if (items.size > 1) {
+                                                    val prevPage = (pagerState.currentPage - 1 + items.size) % items.size
+                                                    coroutineScope.launch {
+                                                        homeFocusCoordinator.isHeroFocusTransferring = true
+                                                        pagerState.animateScrollToPage(prevPage)
+                                                        delay(50L)
+                                                        runCatching { homeFocusCoordinator.heroViewDetailsFocusRequester.requestFocus() }
+                                                        delay(150L)
+                                                        homeFocusCoordinator.isHeroFocusTransferring = false
+                                                    }
+                                                }
+                                                true
+                                            }
+                                            Key.DirectionRight -> {
+                                                if (items.size > 1) {
+                                                    val nextPage = (pagerState.currentPage + 1) % items.size
+                                                    coroutineScope.launch {
+                                                        homeFocusCoordinator.isHeroFocusTransferring = true
+                                                        pagerState.animateScrollToPage(nextPage)
+                                                        delay(50L)
+                                                        runCatching { homeFocusCoordinator.heroViewDetailsFocusRequester.requestFocus() }
+                                                        delay(150L)
+                                                        homeFocusCoordinator.isHeroFocusTransferring = false
+                                                    }
+                                                }
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    }
+                                    .dpadFocusRing(
+                                        interactionSource = heroButtonInteractionSource,
+                                        cornerRadius = 40.dp,
+                                        scaleFactor = 1.08f,
+                                        isAlreadyFocused = homeFocusCoordinator.isHeroButtonFocused.value || homeFocusCoordinator.isHeroFocusTransferring,
+                                    )
+                            } else Modifier
+                        )
+                        .clickable(
+                            interactionSource = heroButtonInteractionSource,
+                            indication = null,
+                        ) { onItemClick(currentItem) },
+                    color = colorScheme.onBackground,
+                    contentColor = colorScheme.background,
+                    shape = RoundedCornerShape(40.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.home_view_details),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
 
             if (isFullscreenActionSupported) {
@@ -914,11 +975,8 @@ private fun HeroContentBlock(
 private fun DesktopHeroContentBlock(
     item: MetaPreview,
     layout: HomeHeroLayout,
-    onItemClick: ((MetaPreview) -> Unit)?,
     isActivePage: Boolean = true,
     isFocusRequesterTarget: Boolean = true,
-    onNavigatePreviousPage: () -> Unit = {},
-    onNavigateNextPage: () -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
     var logoLoadError by remember(item.type, item.id, item.logo) {
@@ -927,15 +985,7 @@ private fun DesktopHeroContentBlock(
     val logoUrl = item.logo?.takeIf { it.isNotBlank() }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = onItemClick != null,
-            ) {
-                onItemClick?.invoke(item)
-            },
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.Start,
     ) {
         if (logoUrl != null && !logoLoadError) {
@@ -1003,78 +1053,6 @@ private fun DesktopHeroContentBlock(
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-
-        if (onItemClick != null) {
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s24))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val homeFocusCoordinator = com.nuvio.app.features.home.components.LocalHomeFocusCoordinator.current
-                val heroButtonInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                Surface(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .then(
-                            if (homeFocusCoordinator != null && isActivePage) {
-                                Modifier
-                                    .then(if (isFocusRequesterTarget) Modifier.focusRequester(homeFocusCoordinator.heroViewDetailsFocusRequester) else Modifier)
-                                    .focusProperties { 
-                                        down = homeFocusCoordinator.downFromHeroTarget() 
-                                        up = homeFocusCoordinator.fullscreenButtonFocusRequester
-                                    }
-                                    .onFocusChanged { state ->
-                                        homeFocusCoordinator.isHeroButtonFocused.value = state.isFocused
-                                    }
-                                    .onKeyEvent { event ->
-                                        if (event.type != KeyEventType.KeyDown) {
-                                            false
-                                        } else {
-                                            when (event.key) {
-                                                Key.DirectionLeft -> {
-                                                    onNavigatePreviousPage()
-                                                    true
-                                                }
-                                                Key.DirectionRight -> {
-                                                    onNavigateNextPage()
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        }
-                                    }
-                                    .dpadFocusRing(
-                                        interactionSource = heroButtonInteractionSource,
-                                        cornerRadius = 40.dp,
-                                        scaleFactor = 1.08f,
-                                        isAlreadyFocused = homeFocusCoordinator?.isHeroButtonFocused?.value == true || homeFocusCoordinator?.isHeroFocusTransferring == true,
-                                    )
-                            } else {
-                                Modifier.focusProperties { canFocus = false }
-                            },
-                        )
-                        .clickable(
-                            interactionSource = heroButtonInteractionSource,
-                            indication = null,
-                        ) { onItemClick(item) },
-                    color = colorScheme.onBackground,
-                    contentColor = colorScheme.background,
-                    shape = RoundedCornerShape(40.dp),
-                ) {
-                    Box(
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.home_view_details),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
         }
     }
 }

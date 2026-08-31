@@ -367,6 +367,7 @@ let pendingSubtitleOptionId = "";
 let pendingIsPlaying = null;
 let pendingPlaybackTimer = 0;
 let lastNativeIsPlaying = true;
+let pendingVolumeToast = false;
 let suppressNextPointerToggleClick = false;
 let pendingCustomSubtitleStyling = null;
 let pendingCustomSubtitleStylingTimer = 0;
@@ -499,8 +500,7 @@ const volumeToastLabel = (fallbackDelta = 0) => {
   const volumeLevel = state.volumeLevel;
   if (typeof volumeLevel === "number" && Number.isFinite(volumeLevel)) {
 if (volumeLevel <= 0) return "Muted";
-    return `Volume ${Math.round(Math.max(0, Math.min(1, volumeLevel)) * 100)}%`;
-return `Volume ${Math.round(clampVolumeLevel(volumeLevel) * 100)}%`;
+    return `Volume ${Math.round(clampVolumeLevel(volumeLevel) * 100)}%`;
   }
   return fallbackDelta < 0 ? "Volume down" : "Volume up";
 };
@@ -2282,6 +2282,7 @@ const render = () => {
   applyTheme();
   renderChrome();
   renderActiveModal();
+  syncVolumeControl();
 };
 
 const focusShortcutRoot = () => {
@@ -2344,8 +2345,6 @@ const shortcutCommandForEvent = event => {
     }
   }
   switch (event.code) {
-    case "KeyK":
-      return "keyboardToggle";
     case "ArrowLeft":
     case "KeyJ":
       return isShift ? "keyboardFineSeekBack" : "keyboardSeekBack";
@@ -3079,6 +3078,7 @@ window.playerUpdate = update => {
     }
   }
   renderChrome();
+  syncVolumeControl();
   if ((audioTracksChanged && activeModal === "audio") ||
       (subtitleTracksChanged && activeModal === "subtitles")) {
     renderActiveModal();
@@ -3102,7 +3102,7 @@ window.playerControls = nextState => {
     ...state,
     ...nextState,
     isPlaying: currentPlaybackState,
-    volumeLevel: currentVolumeLevel ?? nextState.volumeLevel,
+    volumeLevel: nextState.volumeLevel !== undefined ? nextState.volumeLevel : currentVolumeLevel,
   };
   if (typeof state.volumeLevel === "number" && state.volumeLevel > 0) {
     preMuteVolumeLevel = state.volumeLevel;
@@ -3136,6 +3136,10 @@ window.playerControls = nextState => {
       (state.selectedSubtitleOptionId || "") !== previousSelectedSubtitleOptionId)
   ) {
     resetSubtitleSelectionState();
+  }
+  if (pendingVolumeToast) {
+    pendingVolumeToast = false;
+    showPlayerToast(volumeToastLabel());
   }
   render();
   if (pendingSettingToastCommand === "resize" && (state.resizeModeLabel || "") !== previousResizeLabel) {
@@ -3538,7 +3542,7 @@ document.addEventListener("keyup", event => {
     }
     return;
   }
-  if (event.code === "Space") {
+  if (event.code === "Space" || event.code === "KeyK") {
     if (spaceHoldTimer) {
       window.clearTimeout(spaceHoldTimer);
       spaceHoldTimer = null;
@@ -3592,7 +3596,6 @@ document.addEventListener("keydown", event => {
   if (playbackErrorText()) return;
   const isMacFullscreenShortcut = event.code === "KeyF" && event.metaKey && event.ctrlKey && !event.altKey;
 if (event.code === "F11" || (event.code === "KeyF" && !isTextEntryTarget(event.target)) || isMacFullscreenShortcut) {
-if (event.code === "F11" || isMacFullscreenShortcut) {
     if (spaceHoldTimer) {
       window.clearTimeout(spaceHoldTimer);
       spaceHoldTimer = null;
@@ -3634,7 +3637,7 @@ if (event.metaKey || event.ctrlKey || event.altKey || event.key === "Alt" || eve
   if (activeModal || isTextEntryTarget(event.target)) {
     return;
   }
-  if (event.code === "Space") {
+  if (event.code === "Space" || event.code === "KeyK") {
     event.preventDefault();
     if (event.repeat) {
       if (!isSpeedBoosting) {
@@ -3689,7 +3692,9 @@ if (command === "audio" || command === "subtitles") {
     episodeStreamFilterId = "";
     openPlayerModal("episodes");
     send("episodes", 0);
-if (command === "keyboardFineSeekForward") {
+    return;
+  }
+  if (command === "keyboardFineSeekForward") {
     fineSeek(true);
     return;
   }

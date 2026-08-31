@@ -399,8 +399,6 @@ internal fun PlayerScreenRuntime.playNextEpisode() {
     }
 }
 
-
-
 internal fun PlayerScreenRuntime.openSourcesPanel() {
     val vid = activeVideoId ?: return
     PlayerStreamsRepository.loadSources(

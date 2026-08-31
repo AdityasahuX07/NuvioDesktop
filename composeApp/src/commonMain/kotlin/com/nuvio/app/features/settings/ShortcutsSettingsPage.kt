@@ -134,7 +134,7 @@ private val generalNavigationShortcuts: List<ShortcutEntry> = listOf(
 private val playerPlaybackShortcuts: List<ShortcutEntry> = listOf(
     ShortcutEntry(
         titleRes = Res.string.settings_shortcuts_play_pause,
-        combos = listOf(listOf("Space"), listOf("Right Click")),
+        combos = listOf(listOf("Space"), listOf("K"), listOf("Right Click")),
     ),
     ShortcutEntry(
         titleRes = Res.string.settings_shortcuts_close_player,
@@ -175,7 +175,7 @@ private val playerPlaybackShortcuts: List<ShortcutEntry> = listOf(
     ),
     ShortcutEntry(
         titleRes = Res.string.settings_shortcuts_hold_to_speed,
-        combos = listOf(listOf("Hold Space"), listOf("Hold Left Click")),
+        combos = listOf(listOf("Hold Space"), listOf("Hold K"), listOf("Hold Left Click")),
     ),
     ShortcutEntry(
         titleRes = Res.string.settings_shortcuts_skip_intro,

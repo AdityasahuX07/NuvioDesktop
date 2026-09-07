@@ -1,4 +1,4 @@
-﻿package com.nuvio.app.features.settings
+package com.nuvio.app.features.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,6 +47,28 @@ internal fun LazyListScope.shortcutsSettingsContent(
                     ShortcutMouseKey(MouseButton.Right, "Right")
                     ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Left, "Hold Left")
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                ShortcutRow("Switch to home", isTablet) {
+                    ShortcutKey("1")
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                ShortcutRow("Switch to search", isTablet) {
+                    ShortcutKey("2")
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                ShortcutRow("Switch to library", isTablet) {
+                    ShortcutKey("3")
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                ShortcutRow("Switch to settings", isTablet) {
+                    ShortcutKey("4")
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                ShortcutRow("Activate search box", isTablet) {
+                    ShortcutKey("/")
+                    ShortcutOrText()
+                    ShortcutKey("0")
                 }
             }
         }

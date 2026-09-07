@@ -36,8 +36,18 @@ internal object NativeTabBridge {
     private val _requestedTabs = MutableSharedFlow<NativeNavigationTab>(extraBufferCapacity = 1)
     val requestedTabs: SharedFlow<NativeNavigationTab> = _requestedTabs.asSharedFlow()
 
+    private val _focusSearchRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val focusSearchRequests: SharedFlow<Unit> = _focusSearchRequests.asSharedFlow()
+
+    var isSearchBoxFocused: Boolean = false
+
     fun requestTab(tabName: String) {
         _requestedTabs.tryEmit(NativeNavigationTab.fromName(tabName))
+    }
+
+    fun requestSearchWithFocus() {
+        requestTab("Search")
+        _focusSearchRequests.tryEmit(Unit)
     }
 
     fun publishSelectedTab(tab: NativeNavigationTab) {

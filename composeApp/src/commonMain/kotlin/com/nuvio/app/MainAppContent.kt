@@ -403,7 +403,15 @@ internal fun MainAppContent(
                 liquidGlassNativeTabBarEnabled
             ) {
                 handleRootTabClick(requestedAppTab)
+            } else if (!useNativeNavigation && isDesktop) {
+                handleRootTabClick(requestedAppTab)
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        NativeTabBridge.focusSearchRequests.collectLatest {
+            searchFocusRequestCount++
         }
     }
 

@@ -20,6 +20,11 @@ import com.nuvio.app.core.deeplink.handleAppUrl
 import com.nuvio.app.core.diagnostics.SentryInitializer
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.features.discordrpc.DiscordPresenceManager
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import com.nuvio.app.core.ui.NativeTabBridge
 import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.configureDesktopQuickJsLibrary
 import com.nuvio.app.features.player.PlatformPlayerSurface
@@ -32,7 +37,6 @@ import com.nuvio.app.features.player.desktop.applyNativeDesktopWindowChrome
 import com.nuvio.app.features.player.desktop.installDesktopAppFullscreenShortcuts
 import com.nuvio.app.features.player.desktop.preloadNativePlayerBridgeAsync
 import com.nuvio.app.features.player.desktop.registerDesktopAppFullscreenToggle
-import com.nuvio.app.features.player.desktop.trackMaximizedBoundsForCurrentScreen
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.settings.AppIconRepository
 import com.nuvio.app.features.settings.applyDesktopRendererPreference
@@ -125,6 +129,19 @@ fun main(args: Array<String>) {
             title = if (smokePlayerUrl == null) "Nuvio" else "Nuvio Player Smoke",
             state = windowState,
             icon = painterResource(appIconState.selected.transparentPreviewResource),
+            onKeyEvent = { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    if (NativeTabBridge.isSearchBoxFocused) return@Window false
+                    when (event.key) {
+                        Key.One, Key.NumPad1 -> { NativeTabBridge.requestTab("Home"); true }
+                        Key.Two, Key.NumPad2 -> { NativeTabBridge.requestTab("Search"); true }
+                        Key.Three, Key.NumPad3 -> { NativeTabBridge.requestTab("Library"); true }
+                        Key.Four, Key.NumPad4 -> { NativeTabBridge.requestTab("Settings"); true }
+                        Key.Slash, Key.Zero, Key.NumPad0 -> { NativeTabBridge.requestSearchWithFocus(); true }
+                        else -> false
+                    }
+                } else false
+            }
         ) {
             SideEffect {
                 window.background = NuvioDesktopNativeBackground
@@ -197,11 +214,9 @@ fun main(args: Array<String>) {
                     },
                 )
                 val uninstallFullscreenShortcuts = installDesktopAppFullscreenShortcuts(window)
-                val untrackMaximizedBounds = window.trackMaximizedBoundsForCurrentScreen()
                 onDispose {
                     fullscreenController.dispose(window)
                     uninstallFullscreenShortcuts()
-                    untrackMaximizedBounds()
                     unregisterFullscreenToggle()
                 }
             }

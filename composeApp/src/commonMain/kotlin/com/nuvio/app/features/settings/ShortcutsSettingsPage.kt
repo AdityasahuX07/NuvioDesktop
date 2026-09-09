@@ -42,8 +42,6 @@ internal fun LazyListScope.shortcutsSettingsContent(
                 ShortcutRow(Res.string.shortcuts_go_back, isTablet) {
                     ShortcutKey(Res.string.shortcuts_key_esc)
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_backspace)
-                    ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Backward, Res.string.shortcuts_mouse_backward)
                 }
                 SettingsGroupDivider(isTablet = isTablet)

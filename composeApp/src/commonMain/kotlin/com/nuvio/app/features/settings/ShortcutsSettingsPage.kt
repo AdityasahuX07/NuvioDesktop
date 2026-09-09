@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.nuvio
 import nuvio.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.shortcutsSettingsContent(
@@ -35,39 +34,39 @@ internal fun LazyListScope.shortcutsSettingsContent(
 ) {
     item {
         SettingsSection(
-            title = stringResource(Res.string.shortcuts_section_general_navigation),
+            title = stringResource(Res.string.compose_settings_shortcuts_section_general),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                ShortcutRow(Res.string.shortcuts_go_back, isTablet) {
-                    ShortcutKey("Esc")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_back), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_esc))
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Backward, Res.string.shortcuts_mouse_backward)
+                    ShortcutMouseKey(MouseButton.Backward, stringResource(Res.string.compose_settings_shortcuts_mouse_backward))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_show_options, isTablet) {
-                    ShortcutMouseKey(MouseButton.Right, Res.string.shortcuts_mouse_right)
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_options), isTablet) {
+                    ShortcutMouseKey(MouseButton.Right, stringResource(Res.string.compose_settings_shortcuts_mouse_right))
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Left, Res.string.shortcuts_mouse_hold_left)
+                    ShortcutMouseKey(MouseButton.Left, stringResource(Res.string.compose_settings_shortcuts_mouse_hold_left))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_switch_home, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_home), isTablet) {
                     ShortcutKey("1")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_switch_search, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_search), isTablet) {
                     ShortcutKey("2")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_switch_library, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_library), isTablet) {
                     ShortcutKey("3")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_switch_settings, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_settings), isTablet) {
                     ShortcutKey("4")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_activate_search, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_search_box), isTablet) {
                     ShortcutKey("/")
                     ShortcutOrText()
                     ShortcutKey("0")
@@ -78,77 +77,77 @@ internal fun LazyListScope.shortcutsSettingsContent(
     
     item {
         SettingsSection(
-            title = stringResource(Res.string.shortcuts_section_player_playback),
+            title = stringResource(Res.string.compose_settings_shortcuts_section_player),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                ShortcutRow(Res.string.shortcuts_play_pause, isTablet) {
-                    ShortcutKey("Space")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_play_pause), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_space))
                     ShortcutOrText()
                     ShortcutKey("K")
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Left, Res.string.shortcuts_mouse_left)
+                    ShortcutMouseKey(MouseButton.Left, stringResource(Res.string.compose_settings_shortcuts_mouse_left))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_switch_audio_track, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_audio_track), isTablet) {
                     ShortcutKey("B")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_toggle_subtitle, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_subtitle_toggle), isTablet) {
                     ShortcutKey("V")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_toggle_mute, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_mute), isTablet) {
                     ShortcutKey("M")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_seek, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_seek), isTablet) {
                     ShortcutIconKey(Icons.Default.KeyboardArrowLeft)
                     ShortcutOrText()
                     ShortcutIconKey(Icons.Default.KeyboardArrowRight)
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Forward, Res.string.shortcuts_mouse_forward)
+                    ShortcutMouseKey(MouseButton.Forward, stringResource(Res.string.compose_settings_shortcuts_mouse_forward))
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Backward, Res.string.shortcuts_mouse_backward)
+                    ShortcutMouseKey(MouseButton.Backward, stringResource(Res.string.compose_settings_shortcuts_mouse_backward))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_volume, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_volume), isTablet) {
                     ShortcutIconKey(Icons.Default.KeyboardArrowUp)
                     ShortcutOrText()
                     ShortcutIconKey(Icons.Default.KeyboardArrowDown)
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.ScrollUp, Res.string.shortcuts_mouse_scroll_up)
+                    ShortcutMouseKey(MouseButton.ScrollUp, stringResource(Res.string.compose_settings_shortcuts_mouse_scroll_up))
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.ScrollDown, Res.string.shortcuts_mouse_scroll_down)
+                    ShortcutMouseKey(MouseButton.ScrollDown, stringResource(Res.string.compose_settings_shortcuts_mouse_scroll_down))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_toggle_fullscreen, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_fullscreen), isTablet) {
                     ShortcutKey("F11")
                     ShortcutOrText()
                     ShortcutKey("F")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_skip_intro, isTablet) {
-                    ShortcutKey("Enter")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_skip_intro), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_enter))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_open_audio_selector, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_audio_selector), isTablet) {
                     ShortcutKey("A")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_open_subtitle_selector, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_subtitle_selector), isTablet) {
                     ShortcutKey("S")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_open_source_list, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_source_list), isTablet) {
                     ShortcutKey("Q")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_open_episode_list, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_episode_list), isTablet) {
                     ShortcutKey("E")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_move_focus, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_focus_options), isTablet) {
                     ShortcutIconKey(Icons.Default.KeyboardArrowUp)
                     ShortcutOrText()
                     ShortcutIconKey(Icons.Default.KeyboardArrowDown)
@@ -158,47 +157,47 @@ internal fun LazyListScope.shortcutsSettingsContent(
                     ShortcutIconKey(Icons.Default.KeyboardArrowRight)
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_play_next_episode, isTablet) {
-                    ShortcutKey("Shift")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_next_episode), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_shift))
                     ShortcutPlusText()
                     ShortcutKey("N")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_hold_speed, isTablet) {
-                    ShortcutKey("Hold Space")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_speed_hold), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_hold_space))
                     ShortcutOrText()
-                    ShortcutMouseKey(MouseButton.Left, Res.string.shortcuts_mouse_hold_left)
+                    ShortcutMouseKey(MouseButton.Left, stringResource(Res.string.compose_settings_shortcuts_mouse_hold_left))
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_open_speed_panel, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_speed_panel), isTablet) {
                     ShortcutKey("`")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_speed_control, isTablet) {
-                    ShortcutKey("Shift")
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_speed_control), isTablet) {
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_shift))
                     ShortcutPlusText()
                     ShortcutKey("<")
                     ShortcutOrText()
-                    ShortcutKey("Shift")
+                    ShortcutKey(stringResource(Res.string.compose_settings_shortcuts_key_shift))
                     ShortcutPlusText()
                     ShortcutKey(">")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_reset_speed, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_speed_reset), isTablet) {
                     ShortcutKey("/")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_subtitle_delay, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_subtitle_delay), isTablet) {
                     ShortcutKey("G")
                     ShortcutOrText()
                     ShortcutKey("H")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_toggle_subtitle_opacity, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_sub_opacity_toggle), isTablet) {
                     ShortcutKey("O")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
-                ShortcutRow(Res.string.shortcuts_adjust_subtitle_opacity, isTablet) {
+                ShortcutRow(stringResource(Res.string.compose_settings_shortcuts_row_sub_opacity_adjust), isTablet) {
                     ShortcutKey("I")
                     ShortcutOrText()
                     ShortcutKey("P")
@@ -210,7 +209,7 @@ internal fun LazyListScope.shortcutsSettingsContent(
 
 @Composable
 private fun ShortcutRow(
-    title: StringResource,
+    title: String,
     isTablet: Boolean,
     keys: @Composable RowScope.() -> Unit,
 ) {
@@ -226,7 +225,7 @@ private fun ShortcutRow(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text = stringResource(title),
+            text = title,
             style = MaterialTheme.typography.bodyLarge,
             color = tokens.colors.textPrimary,
         )
@@ -295,11 +294,7 @@ private fun ShortcutIconKey(icon: androidx.compose.ui.graphics.vector.ImageVecto
 enum class MouseButton { Left, Right, Middle, ScrollUp, ScrollDown, Forward, Backward, None }
 
 @Composable
-private fun ShortcutMouseKey(
-    button: MouseButton,
-    label: StringResource,
-    modifier: Modifier = Modifier,
-) {
+private fun ShortcutMouseKey(button: MouseButton, label: String, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .border(
@@ -339,7 +334,7 @@ private fun ShortcutMouseKey(
             }
             
             Text(
-                text = stringResource(label),
+                text = label,
                 color = MaterialTheme.nuvio.colors.textPrimary,
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodyMedium,
@@ -352,7 +347,7 @@ private fun ShortcutMouseKey(
 @Composable
 private fun ShortcutOrText() {
     Text(
-        text = stringResource(Res.string.shortcuts_or),
+        text = stringResource(Res.string.compose_settings_shortcuts_or),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.nuvio.colors.textSecondary,
         modifier = Modifier.padding(horizontal = 2.dp)
@@ -362,7 +357,7 @@ private fun ShortcutOrText() {
 @Composable
 private fun ShortcutPlusText() {
     Text(
-        text = stringResource(Res.string.shortcuts_plus),
+        text = "+",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.nuvio.colors.textSecondary,
         modifier = Modifier.padding(horizontal = 2.dp)

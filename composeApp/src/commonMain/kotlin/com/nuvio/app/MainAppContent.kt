@@ -416,8 +416,20 @@ internal fun MainAppContent(
     }
 
     LaunchedEffect(Unit) {
+        // Esc and Backspace both funnel through NativeTabBridge.requestBack() (see
+        // Main.kt), so they reuse this exact same "go back" call as the mouse
+        // Back button below.
         NativeTabBridge.backRequests.collectLatest {
-            navController.popBackStack()
+            // Settings' sub-page navigation (e.g. Playback -> Root) is local
+            // composable state, not part of navBackStack, so popBackStack() has
+            // nothing to pop while sitting on the tab bar with Settings selected.
+            // Route through the same "step back one level" flow used when the
+            // Settings tab is reselected instead.
+            if (selectedTab == AppScreenTab.Settings && currentRoute is TabsRoute) {
+                settingsRootActionRequests.tryEmit(Unit)
+            } else {
+                navController.popBackStack()
+            }
         }
     }
 
@@ -1269,7 +1281,11 @@ internal fun MainAppContent(
                                     if (!event.changes.any { it.isConsumed }) {
                                         if (event.button == PointerButton.Back) {
                                             event.changes.forEach { it.consume() }
-                                            navController.popBackStack()
+                                            if (selectedTab == AppScreenTab.Settings && currentRoute is TabsRoute) {
+                                                settingsRootActionRequests.tryEmit(Unit)
+                                            } else {
+                                                navController.popBackStack()
+                                            }
                                         }
                                     }
                                 }

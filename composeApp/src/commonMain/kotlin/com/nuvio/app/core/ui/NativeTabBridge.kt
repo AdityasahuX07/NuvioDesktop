@@ -42,7 +42,10 @@ internal object NativeTabBridge {
     private val _backRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val backRequests: SharedFlow<Unit> = _backRequests.asSharedFlow()
 
-    var isSearchBoxFocused: Boolean = false
+    // Set by any Compose text input (not just the Search tab's box) when it gains or
+    // loses focus, so the desktop window's global key shortcuts (see Main.kt) know to
+    // stand down while the user is typing anywhere in the app.
+    var isTextInputFocused: Boolean = false
 
     fun requestTab(tabName: String) {
         _requestedTabs.tryEmit(NativeNavigationTab.fromName(tabName))

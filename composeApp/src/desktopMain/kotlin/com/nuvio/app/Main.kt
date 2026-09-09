@@ -41,6 +41,7 @@ import com.nuvio.app.features.player.desktop.applyNativeDesktopWindowChrome
 import com.nuvio.app.features.player.desktop.installDesktopAppFullscreenShortcuts
 import com.nuvio.app.features.player.desktop.preloadNativePlayerBridgeAsync
 import com.nuvio.app.features.player.desktop.registerDesktopAppFullscreenToggle
+import com.nuvio.app.features.player.desktop.trackMaximizedBoundsForCurrentScreen
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.settings.AppIconRepository
 import com.nuvio.app.features.settings.applyDesktopRendererPreference
@@ -135,9 +136,9 @@ fun main(args: Array<String>) {
             icon = painterResource(appIconState.selected.transparentPreviewResource),
             onKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    if (NativeTabBridge.isTextInputFocused) return@Window false
+                    if (NativeTabBridge.isSearchBoxFocused) return@Window false
                     // Plain-key shortcuts only: bail out on any modifier so combinations
-                    // like Ctrl+1 or Alt+Backspace aren't swallowed by these bindings.
+                    // like Ctrl+1 or Alt+Escape aren't swallowed by these bindings.
                     if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed || event.isShiftPressed) {
                         return@Window false
                     }
@@ -147,9 +148,7 @@ fun main(args: Array<String>) {
                         Key.Three, Key.NumPad3 -> { NativeTabBridge.requestTab("Library"); true }
                         Key.Four, Key.NumPad4 -> { NativeTabBridge.requestTab("Settings"); true }
                         Key.Slash, Key.Zero, Key.NumPad0 -> { NativeTabBridge.requestSearchWithFocus(); true }
-                        // Backspace mirrors Esc here: both are the "go back" keybinding
-                        // (see ShortcutsSettingsPage), reusing the exact same trigger.
-                        Key.Escape, Key.Backspace -> { NativeTabBridge.requestBack(); true }
+                        Key.Escape -> { NativeTabBridge.requestBack(); true }
                         else -> false
                     }
                 } else false
@@ -179,16 +178,9 @@ fun main(args: Array<String>) {
                 fullscreenController.applyRestoredFullscreenState(window, windowState, wasFullscreenOnLastExit)
             }
             DisposableEffect(window) {
-                // On Windows, java.awt.Frame maximizes to the bounds of whichever screen it
-                // last computed maximizedBounds for, and does not recompute this automatically
-                // when the window is dragged to a different monitor. Without this, maximizing
-                // a window that was moved to a secondary display can snap it to the primary
-                // display's work area instead. Keep it current for the screen under the window.
-                val stopTracking = if (DesktopHostOs.current == DesktopHostOs.WINDOWS) {
-                    trackMaximizedBoundsForCurrentScreen(window)
-                } else {
-                    {}
-                }
+                // Windows multi-monitor maximize workaround — see DesktopMaximizedBounds.kt.
+                // (No-op on non-Windows: the helper checks the host OS itself.)
+                val stopTracking = window.trackMaximizedBoundsForCurrentScreen()
                 onDispose { stopTracking() }
             }
             LaunchedEffect(windowState) {
@@ -275,31 +267,6 @@ fun main(args: Array<String>) {
  * whenever it moves or resizes, so double-click-titlebar / Win+Up maximize always targets the
  * correct monitor. Returns a callback to stop tracking and remove the listener.
  */
-private fun trackMaximizedBoundsForCurrentScreen(window: java.awt.Window): () -> Unit {
-    val frame = window as? java.awt.Frame ?: return {}
-
-    fun applyBoundsForCurrentScreen() {
-        val config = frame.graphicsConfiguration ?: return
-        val screenBounds = config.bounds
-        val insets = runCatching { frame.toolkit.getScreenInsets(config) }
-            .getOrDefault(java.awt.Insets(0, 0, 0, 0))
-        frame.maximizedBounds = java.awt.Rectangle(
-            screenBounds.x + insets.left,
-            screenBounds.y + insets.top,
-            screenBounds.width - insets.left - insets.right,
-            screenBounds.height - insets.top - insets.bottom,
-        )
-    }
-
-    applyBoundsForCurrentScreen()
-    val listener = object : java.awt.event.ComponentAdapter() {
-        override fun componentMoved(e: java.awt.event.ComponentEvent) = applyBoundsForCurrentScreen()
-        override fun componentResized(e: java.awt.event.ComponentEvent) = applyBoundsForCurrentScreen()
-    }
-    frame.addComponentListener(listener)
-    return { frame.removeComponentListener(listener) }
-}
-
 private fun configureDesktopChrome() {
     if (System.getProperty("os.name").contains("mac", ignoreCase = true)) {
         System.setProperty("apple.awt.application.appearance", MacosDarkAquaAppearance)

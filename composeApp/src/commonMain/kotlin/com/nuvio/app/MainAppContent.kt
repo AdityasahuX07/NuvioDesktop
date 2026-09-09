@@ -416,9 +416,6 @@ internal fun MainAppContent(
     }
 
     LaunchedEffect(Unit) {
-        // Esc and Backspace both funnel through NativeTabBridge.requestBack() (see
-        // Main.kt), so they reuse this exact same "go back" call as the mouse
-        // Back button below.
         NativeTabBridge.backRequests.collectLatest {
             navController.popBackStack()
         }

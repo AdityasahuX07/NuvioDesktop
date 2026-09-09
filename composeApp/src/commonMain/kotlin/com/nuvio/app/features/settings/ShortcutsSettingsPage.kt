@@ -40,7 +40,7 @@ internal fun LazyListScope.shortcutsSettingsContent(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 ShortcutRow(Res.string.shortcuts_go_back, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_esc)
+                    ShortcutKey("Esc")
                     ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Backward, Res.string.shortcuts_mouse_backward)
                 }
@@ -52,25 +52,25 @@ internal fun LazyListScope.shortcutsSettingsContent(
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_switch_home, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_1)
+                    ShortcutKey("1")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_switch_search, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_2)
+                    ShortcutKey("2")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_switch_library, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_3)
+                    ShortcutKey("3")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_switch_settings, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_4)
+                    ShortcutKey("4")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_activate_search, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_slash)
+                    ShortcutKey("/")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_0)
+                    ShortcutKey("0")
                 }
             }
         }
@@ -83,23 +83,23 @@ internal fun LazyListScope.shortcutsSettingsContent(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 ShortcutRow(Res.string.shortcuts_play_pause, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_space)
+                    ShortcutKey("Space")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_k)
+                    ShortcutKey("K")
                     ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Left, Res.string.shortcuts_mouse_left)
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_switch_audio_track, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_b)
+                    ShortcutKey("B")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_toggle_subtitle, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_v)
+                    ShortcutKey("V")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_toggle_mute, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_m)
+                    ShortcutKey("M")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_seek, isTablet) {
@@ -123,29 +123,29 @@ internal fun LazyListScope.shortcutsSettingsContent(
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_toggle_fullscreen, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_f11)
+                    ShortcutKey("F11")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_f)
+                    ShortcutKey("F")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_skip_intro, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_enter)
+                    ShortcutKey("Enter")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_open_audio_selector, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_a)
+                    ShortcutKey("A")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_open_subtitle_selector, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_s)
+                    ShortcutKey("S")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_open_source_list, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_q)
+                    ShortcutKey("Q")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_open_episode_list, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_e)
+                    ShortcutKey("E")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_move_focus, isTablet) {
@@ -159,49 +159,49 @@ internal fun LazyListScope.shortcutsSettingsContent(
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_play_next_episode, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_shift)
+                    ShortcutKey("Shift")
                     ShortcutPlusText()
-                    ShortcutKey(Res.string.shortcuts_key_n)
+                    ShortcutKey("N")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_hold_speed, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_hold_space)
+                    ShortcutKey("Hold Space")
                     ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Left, Res.string.shortcuts_mouse_hold_left)
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_open_speed_panel, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_backtick)
+                    ShortcutKey("`")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_speed_control, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_shift)
+                    ShortcutKey("Shift")
                     ShortcutPlusText()
-                    ShortcutKey(Res.string.shortcuts_key_less_than)
+                    ShortcutKey("<")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_shift)
+                    ShortcutKey("Shift")
                     ShortcutPlusText()
-                    ShortcutKey(Res.string.shortcuts_key_greater_than)
+                    ShortcutKey(">")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_reset_speed, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_slash)
+                    ShortcutKey("/")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_subtitle_delay, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_g)
+                    ShortcutKey("G")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_h)
+                    ShortcutKey("H")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_toggle_subtitle_opacity, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_o)
+                    ShortcutKey("O")
                 }
                 SettingsGroupDivider(isTablet = isTablet)
                 ShortcutRow(Res.string.shortcuts_adjust_subtitle_opacity, isTablet) {
-                    ShortcutKey(Res.string.shortcuts_key_i)
+                    ShortcutKey("I")
                     ShortcutOrText()
-                    ShortcutKey(Res.string.shortcuts_key_p)
+                    ShortcutKey("P")
                 }
             }
         }
@@ -240,7 +240,7 @@ private fun ShortcutRow(
 }
 
 @Composable
-private fun ShortcutKey(label: StringResource) {
+private fun ShortcutKey(label: String) {
     val tokens = MaterialTheme.nuvio
     Box(
         modifier = Modifier
@@ -257,7 +257,7 @@ private fun ShortcutKey(label: StringResource) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = stringResource(label),
+            text = label,
             style = MaterialTheme.typography.labelLarge,
             color = tokens.colors.textPrimary,
             fontWeight = FontWeight.Bold,

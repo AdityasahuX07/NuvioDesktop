@@ -45,8 +45,8 @@ internal enum class SettingsCategory(
     Account(Res.string.settings_account, Icons.Rounded.AccountCircle),
     General(Res.string.compose_settings_category_general, Icons.Rounded.Settings),
     About(Res.string.compose_settings_category_about, Icons.Rounded.Info),
-    Advanced(Res.string.compose_settings_page_advanced, Icons.Rounded.Tune),
     Shortcuts(Res.string.compose_settings_page_shortcuts, Icons.Rounded.Keyboard),
+    Advanced(Res.string.compose_settings_page_advanced, Icons.Rounded.Tune),
 }
 
 internal enum class SettingsPage(

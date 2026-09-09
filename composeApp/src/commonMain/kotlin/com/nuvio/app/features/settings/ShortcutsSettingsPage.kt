@@ -40,6 +40,8 @@ internal fun LazyListScope.shortcutsSettingsContent(
                 ShortcutRow("Go back / previous screen", isTablet) {
                     ShortcutKey("Esc")
                     ShortcutOrText()
+                    ShortcutKey("Backspace")
+                    ShortcutOrText()
                     ShortcutMouseKey(MouseButton.Backward, "Backward")
                 }
                 SettingsGroupDivider(isTablet = isTablet)

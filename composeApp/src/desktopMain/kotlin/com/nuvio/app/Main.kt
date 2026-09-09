@@ -138,6 +138,9 @@ fun main(args: Array<String>) {
                         Key.Three, Key.NumPad3 -> { NativeTabBridge.requestTab("Library"); true }
                         Key.Four, Key.NumPad4 -> { NativeTabBridge.requestTab("Settings"); true }
                         Key.Slash, Key.Zero, Key.NumPad0 -> { NativeTabBridge.requestSearchWithFocus(); true }
+                        // Backspace mirrors Esc here: both are the "go back" keybinding
+                        // (see ShortcutsSettingsPage), reusing the exact same trigger.
+                        Key.Escape, Key.Backspace -> { NativeTabBridge.requestBack(); true }
                         else -> false
                     }
                 } else false

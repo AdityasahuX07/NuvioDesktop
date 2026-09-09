@@ -279,7 +279,7 @@ fun SearchScreen(
                             placeholder = stringResource(Res.string.compose_search_placeholder),
                             modifier = Modifier
                                 .focusRequester(focusRequester)
-                                .onFocusChanged { NativeTabBridge.isTextInputFocused = it.isFocused }
+                                .onFocusChanged { NativeTabBridge.isSearchBoxFocused = it.isFocused }
                                 .onKeyEvent {
                                     if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) {
                                         focusManager.clearFocus()

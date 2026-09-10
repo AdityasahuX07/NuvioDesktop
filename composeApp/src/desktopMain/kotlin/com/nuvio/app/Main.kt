@@ -136,7 +136,7 @@ fun main(args: Array<String>) {
             icon = painterResource(appIconState.selected.transparentPreviewResource),
             onKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    if (NativeTabBridge.isSearchBoxFocused) return@Window false
+                    if (NativeTabBridge.isAnyTextInputFocused) return@Window false
                     // Plain-key shortcuts only: bail out on any modifier so combinations
                     // like Ctrl+1 or Alt+Escape aren't swallowed by these bindings.
                     if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed || event.isShiftPressed) {

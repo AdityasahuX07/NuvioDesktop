@@ -35,9 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
+import com.nuvio.app.core.ui.trackTextInputFocusForShortcutGuard
 import androidx.compose.ui.text.font.FontWeight
-import com.nuvio.app.core.ui.NativeTabBridge
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -279,7 +278,7 @@ fun SearchScreen(
                             placeholder = stringResource(Res.string.compose_search_placeholder),
                             modifier = Modifier
                                 .focusRequester(focusRequester)
-                                .onFocusChanged { NativeTabBridge.isSearchBoxFocused = it.isFocused }
+                                .trackTextInputFocusForShortcutGuard()
                                 .onKeyEvent {
                                     if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) {
                                         focusManager.clearFocus()

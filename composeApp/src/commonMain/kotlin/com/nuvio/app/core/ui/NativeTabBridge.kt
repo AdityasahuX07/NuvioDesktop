@@ -1,5 +1,10 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import com.nuvio.app.features.profiles.AvatarRepository
 import com.nuvio.app.features.profiles.AvatarCatalogItem
 import com.nuvio.app.features.profiles.MAX_PROFILES
@@ -42,13 +47,28 @@ internal object NativeTabBridge {
     private val _backRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val backRequests: SharedFlow<Unit> = _backRequests.asSharedFlow()
 
-    // Set by the Search tab's input box when it gains or loses focus, so the desktop
-    // window's global key shortcuts (see Main.kt) know to stand down while the user is
-    // typing there. NOTE: this only covers the Search box — it is not a general
-    // "any text field is focused" signal. Other text inputs elsewhere in the app do not
-    // set this, which is why Main.kt's shortcut list is kept to bindings that are safe
-    // even when an untracked text field has focus.
-    var isSearchBoxFocused: Boolean = false
+    // Tokens for every text input that currently has focus, anywhere in the app. Using a
+    // set of per-field tokens (rather than a single boolean owned by one screen) means any
+    // number of text inputs — search, settings, addon URL, server URL, etc. — can report
+    // their own focus state independently without clobbering each other, and a field that
+    // leaves the composition while still focused (e.g. navigating away mid-edit) is
+    // guaranteed to clear itself via DisposableEffect instead of leaving the guard stuck on.
+    private val focusedTextInputTokens = mutableSetOf<Any>()
+
+    // True whenever ANY text input anywhere in the app currently has focus. Desktop's
+    // global keyboard shortcuts (1-4, /, 0, Esc — see Main.kt / installDesktopNavigationShortcuts)
+    // must stand down while this is true, or typing into any field would trigger navigation
+    // instead of entering the typed character.
+    val isAnyTextInputFocused: Boolean
+        get() = focusedTextInputTokens.isNotEmpty()
+
+    fun setTextInputFocused(token: Any, focused: Boolean) {
+        if (focused) {
+            focusedTextInputTokens.add(token)
+        } else {
+            focusedTextInputTokens.remove(token)
+        }
+    }
 
     fun requestTab(tabName: String) {
         _requestedTabs.tryEmit(NativeNavigationTab.fromName(tabName))
@@ -210,6 +230,22 @@ class NativeProfileSwitcherController {
 
 fun nativeTabSelect(tabName: String) {
     NativeTabBridge.requestTab(tabName)
+}
+
+// Attach to any text input's Modifier chain to register its focus state with the global
+// shortcut guard (NativeTabBridge.isAnyTextInputFocused). Unlike a bare
+// `.onFocusChanged { NativeTabBridge.isSearchBoxFocused = it.isFocused }`, this also clears
+// itself automatically if the field is disposed while still focused, so the guard can never
+// get stuck "on" after navigating away from a focused field.
+@Composable
+fun Modifier.trackTextInputFocusForShortcutGuard(): Modifier {
+    val token = remember { Any() }
+    DisposableEffect(token) {
+        onDispose { NativeTabBridge.setTextInputFocused(token, false) }
+    }
+    return this.onFocusChanged { state ->
+        NativeTabBridge.setTextInputFocused(token, state.isFocused)
+    }
 }
 
 internal expect fun isLiquidGlassNativeTabBarSupported(): Boolean
